@@ -5,7 +5,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-flutter-blue.svg)](https://flutter.dev)
 
-Dynamic theming from images for Flutter. Extract colors and create accessible themes automatically.
+Dynamic theming from images for Flutter. Extract vibrant colors and create accessible Material Design 3 themes with Spotify/Luma-style adaptive backgrounds.
+
+## Features
+
+- **Smart color extraction** - Median-cut quantization finds dominant, vibrant colors
+- **Material Design 3** - Uses CAM16/HCT color space for perceptual accuracy
+- **Accessible by default** - WCAG contrast validation ensures readable text
+- **Animated transitions** - Smooth theme changes with `PaletteScope`
+- **Performance optimized** - Content-based caching and configurable quality settings
+- **Zero dependencies** - Beyond Flutter and Material Color Utilities
 
 ## Installation
 
@@ -19,187 +28,252 @@ dependencies:
 ```dart
 import 'package:adaptive_palette/adaptive_palette.dart';
 
+// Extract colors from any ImageProvider
 final colors = await AdaptivePalette.fromImage(
   NetworkImage('https://example.com/image.jpg'),
+  targetBrightness: Brightness.dark,
 );
+
+// colors contains: primary, secondary, background, surface, and their on-colors
 ```
 
-## Example App
+## Usage
 
-See the [example](example/) directory for a complete demo app showing:
-- Music player with Spotify-style backgrounds
-- Photo gallery with adaptive themes  
-- E-commerce product pages
-- Basic color extraction
-
-To run the example:
-
-```bash
-git clone https://github.com/HardikSJain/adaptive_palette.git
-cd adaptive_palette/example
-flutter pub get
-flutter run
-```
-
-### App-Wide Theme
+### Complete App Example
 
 ```dart
+import 'package:adaptive_palette/adaptive_palette.dart';
+import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
+
 void main() => runApp(
-  PaletteScope(
-    seed: const ThemeColors.fallback(),
+  const PaletteScope(
+    seed: ThemeColors.fallback(),
+    brightness: Brightness.dark,
     child: MyApp(),
   ),
 );
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    theme: PaletteScope.of(context).theme,
+    home: const MyHomePage(),
+  );
+}
+
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key});
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  ThemeColors? _colors;
+
+  @override
+  void initState() {
+    super.initState();
+    _extractColors();
+  }
+
+  Future<void> _extractColors() async {
+    final colors = await AdaptivePalette.fromImage(
+      const NetworkImage('https://picsum.photos/800/600'),
+      targetBrightness: Brightness.dark,
+    );
+
+    if (!mounted) return;
+
+    setState(() => _colors = colors);
+
+    // Animate to new theme
+    PaletteScope.of(context).animateTo(
+      colors,
+      duration: const Duration(milliseconds: 800),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: PaletteScope.of(context).theme,
-      home: MyHome(),
+    return Scaffold(
+      body: Center(
+        child: _colors == null
+            ? const CircularProgressIndicator()
+            : Text(
+                'Theme extracted!',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+      ),
     );
   }
 }
-
-// Later, animate to new theme
-AdaptivePalette.fromImage(image).then((colors) {
-  PaletteScope.of(context).animateTo(colors);
-});
 ```
 
-### Blurred Background Widget
+### Creating a Blurred Background (Spotify/Luma Style)
 
 ```dart
-import 'package:adaptive_palette/widgets.dart';
-
-AdaptiveBlurredBackground(
-  image: NetworkImage('album-art.jpg'),
-  blurSigma: 100,
-  child: YourContent(),
+// Build a blurred adaptive background manually
+Stack(
+  fit: StackFit.expand,
+  children: [
+    Transform.scale(
+      scale: 1.2,
+      child: ImageFiltered(
+        imageFilter: ui.ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+        child: Image.network(
+          'https://example.com/cover.jpg',
+          fit: BoxFit.cover,
+        ),
+      ),
+    ),
+    Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Theme.of(context).colorScheme.surface.withOpacity(0.1),
+            Theme.of(context).colorScheme.surface.withOpacity(0.3),
+          ],
+        ),
+      ),
+    ),
+    // Your content here
+  ],
 )
 ```
 
-### Mesh Gradient Widget (NEW!)
+## Demo
 
-iOS 18 / Apple Music-style mesh gradients with perceptual color blending using HCT color space. More advanced than other gradient packages:
+Run the included demo to see adaptive theming in action:
 
-```dart
-import 'package:adaptive_palette/widgets.dart';
-
-AdaptiveMeshGradient(
-  image: NetworkImage('cover-art.jpg'),
-  focalPoints: 5,                              // 2-8 gradient focal points
-  animationStyle: MeshGradientAnimation.flow,  // none, pulse, flow, breathe
-  intensity: 0.85,                             // 0.0-1.0
-  blurLayers: 3,                               // 1-4 layers for depth
-  child: YourContent(),
-)
+```bash
+git clone https://github.com/HardikSJain/adaptive_palette.git
+cd adaptive_palette
+flutter pub get
+flutter run
 ```
 
-## API
+The demo shows a Luma-style adaptive background that extracts colors from an image and smoothly transitions the theme.
+
+## API Reference
 
 ### AdaptivePalette.fromImage()
+
+Extract a theme color palette from an image.
 
 ```dart
 Future<ThemeColors> fromImage(
   ImageProvider provider, {
   Brightness targetBrightness = Brightness.light,
-  int quantizeColors = 48,        // 8-64, more = better quality
-  int resize = 128,                // 64-256, larger = slower
-  double minContrast = 4.5,        // WCAG: 4.5=AA, 7.0=AAA
+  int quantizeColors = 24,        // 8-64, more = better quality, slower
+  int resize = 96,                 // 64-256, larger = slower but more accurate
+  double minContrast = 4.5,        // WCAG contrast ratio: 4.5=AA, 7.0=AAA
 })
 ```
+
+**Parameters:**
+- `provider` - Any Flutter `ImageProvider` (NetworkImage, AssetImage, FileImage, etc.)
+- `targetBrightness` - Generate colors for light or dark theme
+- `quantizeColors` - Number of colors to extract (higher = better quality, slower)
+- `resize` - Downsample image to this size for faster processing
+- `minContrast` - Minimum WCAG contrast ratio for text colors
 
 ### ThemeColors
 
+Generated theme color palette with accessibility guarantees.
+
 ```dart
 class ThemeColors {
-  final Color primary;
-  final Color onPrimary;
-  final Color secondary;
-  final Color onSecondary;
-  final Color background;
-  final Color onBackground;
-  final Color surface;
-  final Color onSurface;
+  final Color primary;         // Main brand color
+  final Color onPrimary;       // Text on primary (contrast-safe)
+  final Color secondary;       // Accent color
+  final Color onSecondary;     // Text on secondary (contrast-safe)
+  final Color background;      // Page background
+  final Color onBackground;    // Text on background (contrast-safe)
+  final Color surface;         // Card/surface color
+  final Color onSurface;       // Text on surface (contrast-safe)
 }
 ```
 
-### AdaptiveBlurredBackground
+### PaletteScope
+
+Animated theme container for app-wide color transitions.
 
 ```dart
-AdaptiveBlurredBackground({
-  required ImageProvider image,
+PaletteScope({
+  required ThemeColors seed,
   required Widget child,
-  double blurSigma = 100.0,        // Blur intensity
-  double scale = 1.3,              // Zoom level
-  double overlayOpacity = 0.2,     // Color overlay strength
-  Duration transitionDuration = const Duration(milliseconds: 800),
+  Brightness brightness = Brightness.light,
 })
+
+// Access the controller
+final controller = PaletteScope.of(context);
+
+// Get current theme
+final theme = controller.theme;
+
+// Animate to new colors
+controller.animateTo(
+  newColors,
+  duration: const Duration(milliseconds: 800),
+  curve: Curves.easeOutCubic,
+);
 ```
-
-### AdaptiveMeshGradient
-
-```dart
-AdaptiveMeshGradient({
-  required ImageProvider image,
-  required Widget child,
-  int focalPoints = 5,                         // 2-8 focal points
-  MeshGradientAnimation animationStyle = flow, // Animation type
-  BlendStrategy blendStrategy = auto,          // Blend mode selection
-  double intensity = 0.85,                     // Effect intensity
-  int blurLayers = 3,                          // 1-4 depth layers
-  Duration transitionDuration = 1200ms,
-})
-```
-
-**Animation Styles:**
-- `MeshGradientAnimation.none` - Static gradient
-- `MeshGradientAnimation.pulse` - Gentle pulsing intensity
-- `MeshGradientAnimation.flow` - Organic flowing movement (recommended)
-- `MeshGradientAnimation.breathe` - Breathing scale effect
-
-## Examples
-
-Run the demo to see 5 different use cases:
-
-```bash
-flutter run
-```
-
-Examples included:
-- Music player (Spotify-style)
-- Photo gallery (Hero animations)
-- E-commerce (Product theming)
-- Basic extraction
-- Image grid
-
-See `lib/examples/` for source code.
 
 ## How It Works
 
-1. **Median-cut quantization** - Extract dominant colors from image
-2. **CAM16/HCT color space** - Perceptual color adjustments (Material Design 3)
-3. **WCAG contrast validation** - Ensures text readability
-4. **Content-based caching** - SHA-1 hash for fast lookups
-5. **Smooth animations** - AnimationController-based theme transitions
+1. **Image processing** - Downsamples image for performance
+2. **Median-cut quantization** - Extracts dominant colors using histogram-based algorithm
+3. **Perceptual scoring** - Ranks colors by saturation, luminance, and population
+4. **HCT color space** - Uses Material Design 3's perceptual color system (Hue-Chroma-Tone)
+5. **WCAG validation** - Ensures all text colors meet accessibility standards
+6. **SHA-1 caching** - Content-based cache prevents re-processing identical images
 
 ## Performance Tips
 
-**Fast extraction (for lists):**
+### Fast extraction (for scrolling lists)
+
 ```dart
-AdaptivePalette.fromImage(image, resize: 64, quantizeColors: 24)
+final colors = await AdaptivePalette.fromImage(
+  image,
+  resize: 64,           // Smaller = faster
+  quantizeColors: 24,   // Fewer colors = faster
+);
 ```
 
-**High quality (for detail views):**
+### High quality (for hero/detail views)
+
 ```dart
-AdaptivePalette.fromImage(image, resize: 256, quantizeColors: 64)
+final colors = await AdaptivePalette.fromImage(
+  image,
+  resize: 256,          // Larger = more accurate
+  quantizeColors: 64,   // More colors = better selection
+);
 ```
 
-**Preload palettes:**
+### Preload palettes
+
 ```dart
-// During splash screen
+// Extract colors during app initialization
 await Future.wait(
   images.map((img) => AdaptivePalette.fromImage(img)),
 );
+// Results are cached for instant access later
 ```
+
+## Requirements
+
+- Flutter SDK: >=3.9.2
+- Dart SDK: >=3.0.0
+
+## Dependencies
+
+- `material_color_utilities` - Material Design 3 color science
+- `crypto` - SHA-1 hashing for content-based caching
+- `cached_network_image` - Efficient network image loading
+- `path_provider` - Cache directory access
