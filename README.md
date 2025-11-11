@@ -1,5 +1,10 @@
 # Adaptive Palette
 
+[![pub package](https://img.shields.io/pub/v/adaptive_palette.svg)](https://pub.dev/packages/adaptive_palette)
+[![CI](https://github.com/HardikSJain/adaptive_palette/workflows/CI/badge.svg)](https://github.com/HardikSJain/adaptive_palette/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Platform](https://img.shields.io/badge/platform-flutter-blue.svg)](https://flutter.dev)
+
 Dynamic theming from images for Flutter. Extract colors and create accessible themes automatically.
 
 ## Installation
