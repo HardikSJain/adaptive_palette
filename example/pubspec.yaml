@@ -1,0 +1,16 @@
+name: adaptive_palette_example
+description: Example app demonstrating adaptive_palette features
+publish_to: 'none'
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  adaptive_palette:
+    path: ../
+  cached_network_image: ^3.4.1
+
+flutter:
+  uses-material-design: true

@@ -23,6 +23,19 @@ dependencies:
   adaptive_palette: ^1.0.0
 ```
 
+## Examples
+
+Check out the [example](example/) directory for complete, runnable examples:
+
+- **[main.dart](example/lib/main.dart)** - Full-featured app with blurred backgrounds and animated color palette display
+- **[simple_example.dart](example/lib/simple_example.dart)** - Minimal implementation showing basic usage
+
+Run the example:
+```bash
+cd example
+flutter run
+```
+
 ## Quick Start
 
 ```dart
