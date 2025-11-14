@@ -702,7 +702,9 @@ String _sha1(Uint8List data) => crypto.sha1.convert(data).toString();
 
 class _PaletteCache {
   static final _PaletteCache instance = _PaletteCache._();
-  final _LruMap<String, ThemeColors> _map = _LruMap(capacity: 16); // Reduced from 64
+  final _LruMap<String, ThemeColors> _map = _LruMap(
+    capacity: 16,
+  ); // Reduced from 64
   _PaletteCache._();
   ThemeColors? get(String key) => _map.get(key);
   void put(String key, ThemeColors val) => _map.put(key, val);
