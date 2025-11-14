@@ -118,8 +118,7 @@ class _AdaptiveBackgroundDemoState extends State<AdaptiveBackgroundDemo>
                               ? child
                               : Container(color: Colors.black);
                         },
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: Colors.black),
+                    errorBuilder: (_, _, _) => Container(color: Colors.black),
                   ),
                 ),
               ),
@@ -165,7 +164,7 @@ class _AdaptiveBackgroundDemoState extends State<AdaptiveBackgroundDemo>
                           child: Image.network(
                             demoImage,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
+                            errorBuilder: (_, _, _) =>
                                 Container(color: const Color(0xFF1A1A1A)),
                           ),
                         ),
