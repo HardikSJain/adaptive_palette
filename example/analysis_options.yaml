@@ -1,3 +1,6 @@
 linter:
   rules:
     prefer_const_constructors: false
+analyzer:
+  errors:
+    deprecated_member_use: ignore

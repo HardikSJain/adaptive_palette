@@ -3,22 +3,22 @@ import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 
 void main() => runApp(
-  const PaletteScope(
-    seed: ThemeColors.fallback(),
-    brightness: Brightness.dark,
-    child: MyApp(),
-  ),
-);
+      const PaletteScope(
+        seed: ThemeColors.fallback(),
+        brightness: Brightness.dark,
+        child: MyApp(),
+      ),
+    );
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    debugShowCheckedModeBanner: false,
-    theme: PaletteScope.of(context).theme,
-    home: const AdaptiveBackgroundDemo(),
-  );
+        debugShowCheckedModeBanner: false,
+        theme: PaletteScope.of(context).theme,
+        home: const AdaptiveBackgroundDemo(),
+      );
 }
 
 /// Ultra-optimized Luma-style adaptive background - ONE FEATURE ONLY
@@ -113,12 +113,13 @@ class _AdaptiveBackgroundDemoState extends State<AdaptiveBackgroundDemo>
                     fit: BoxFit.cover,
                     frameBuilder:
                         (context, child, frame, wasSynchronouslyLoaded) {
-                          if (wasSynchronouslyLoaded) return child;
-                          return frame != null
-                              ? child
-                              : Container(color: Colors.black);
-                        },
-                    errorBuilder: (_, _, _) => Container(color: Colors.black),
+                      if (wasSynchronouslyLoaded) return child;
+                      return frame != null
+                          ? child
+                          : Container(color: Colors.black);
+                    },
+                    errorBuilder: (context, error, stackTrace) =>
+                        Container(color: Colors.black),
                   ),
                 ),
               ),
@@ -134,8 +135,8 @@ class _AdaptiveBackgroundDemoState extends State<AdaptiveBackgroundDemo>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    scheme.surface.withValues(alpha: 0.1),
-                    scheme.surface.withValues(alpha: 0.3),
+                    scheme.surface.withOpacity(0.1),
+                    scheme.surface.withOpacity(0.3),
                   ],
                 ),
               ),
@@ -164,7 +165,7 @@ class _AdaptiveBackgroundDemoState extends State<AdaptiveBackgroundDemo>
                           child: Image.network(
                             demoImage,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
+                            errorBuilder: (context, error, stackTrace) =>
                                 Container(color: const Color(0xFF1A1A1A)),
                           ),
                         ),
@@ -229,7 +230,7 @@ class _AdaptiveBackgroundDemoState extends State<AdaptiveBackgroundDemo>
             Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  Colors.white.withValues(alpha: 0.5),
+                  Colors.white.withOpacity(0.5),
                 ),
               ),
             ),
@@ -256,7 +257,7 @@ class _ColorSwatch extends StatelessWidget {
             color: color,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: Colors.white.withOpacity(0.2),
               width: 2,
             ),
           ),
@@ -266,7 +267,7 @@ class _ColorSwatch extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.white.withValues(alpha: 0.6),
+            color: Colors.white.withOpacity(0.6),
             fontWeight: FontWeight.w500,
           ),
         ),

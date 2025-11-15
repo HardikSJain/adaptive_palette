@@ -114,11 +114,11 @@ class _ExampleHomePageState extends State<ExampleHomePage>
                     fit: BoxFit.cover,
                     frameBuilder:
                         (context, child, frame, wasSynchronouslyLoaded) {
-                          if (wasSynchronouslyLoaded) return child;
-                          return frame != null
-                              ? child
-                              : Container(color: Colors.black);
-                        },
+                      if (wasSynchronouslyLoaded) return child;
+                      return frame != null
+                          ? child
+                          : Container(color: Colors.black);
+                    },
                     errorBuilder: (_, __, ___) =>
                         Container(color: Colors.black),
                   ),
@@ -136,8 +136,8 @@ class _ExampleHomePageState extends State<ExampleHomePage>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    scheme.surface.withValues(alpha: 0.1),
-                    scheme.surface.withValues(alpha: 0.3),
+                    scheme.surface.withOpacity(0.1),
+                    scheme.surface.withOpacity(0.3),
                   ],
                 ),
               ),
@@ -172,7 +172,7 @@ class _ExampleHomePageState extends State<ExampleHomePage>
                           'Dynamic theming from images',
                           style: TextStyle(
                             fontSize: 18,
-                            color: scheme.onSurface.withValues(alpha: 0.7),
+                            color: scheme.onSurface.withOpacity(0.7),
                           ),
                         ),
                         const SizedBox(height: 48),
@@ -237,9 +237,9 @@ class _ColorPaletteDisplay extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.5),
+        color: colors.surface.withOpacity(0.5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.onSurface.withValues(alpha: 0.1)),
+        border: Border.all(color: colors.onSurface.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,7 +287,7 @@ class _ColorChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: Colors.black.withOpacity(0.3),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
@@ -301,7 +301,7 @@ class _ColorChip extends StatelessWidget {
             fontSize: 12,
             color: Theme.of(
               context,
-            ).colorScheme.onSurface.withValues(alpha: 0.7),
+            ).colorScheme.onSurface.withOpacity(0.7),
           ),
         ),
       ],
@@ -327,9 +327,9 @@ class _FeatureCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: scheme.surface.withValues(alpha: 0.3),
+        color: scheme.surface.withOpacity(0.3),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.onSurface.withValues(alpha: 0.1)),
+        border: Border.all(color: scheme.onSurface.withOpacity(0.1)),
       ),
       child: Row(
         children: [
@@ -352,7 +352,7 @@ class _FeatureCard extends StatelessWidget {
                   description,
                   style: TextStyle(
                     fontSize: 14,
-                    color: scheme.onSurface.withValues(alpha: 0.7),
+                    color: scheme.onSurface.withOpacity(0.7),
                   ),
                 ),
               ],
