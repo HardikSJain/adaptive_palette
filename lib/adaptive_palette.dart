@@ -65,14 +65,14 @@ class ThemeColors {
   });
 
   const ThemeColors.fallback()
-    : primary = const Color(0xFF0EA5A3),
-      onPrimary = Colors.white,
-      secondary = const Color(0xFF1E293B),
-      onSecondary = Colors.white,
-      background = const Color(0xFF0A0A0A),
-      onBackground = const Color(0xFFE0E0E0),
-      surface = const Color(0xFF121212),
-      onSurface = const Color(0xFFE0E0E0);
+      : primary = const Color(0xFF0EA5A3),
+        onPrimary = Colors.white,
+        secondary = const Color(0xFF1E293B),
+        onSecondary = Colors.white,
+        background = const Color(0xFF0A0A0A),
+        onBackground = const Color(0xFFE0E0E0),
+        surface = const Color(0xFF121212),
+        onSurface = const Color(0xFFE0E0E0);
 
   ThemeColors copyWith({
     Color? primary,
@@ -83,16 +83,17 @@ class ThemeColors {
     Color? onBackground,
     Color? surface,
     Color? onSurface,
-  }) => ThemeColors(
-    primary: primary ?? this.primary,
-    onPrimary: onPrimary ?? this.onPrimary,
-    secondary: secondary ?? this.secondary,
-    onSecondary: onSecondary ?? this.onSecondary,
-    background: background ?? this.background,
-    onBackground: onBackground ?? this.onBackground,
-    surface: surface ?? this.surface,
-    onSurface: onSurface ?? this.onSurface,
-  );
+  }) =>
+      ThemeColors(
+        primary: primary ?? this.primary,
+        onPrimary: onPrimary ?? this.onPrimary,
+        secondary: secondary ?? this.secondary,
+        onSecondary: onSecondary ?? this.onSecondary,
+        background: background ?? this.background,
+        onBackground: onBackground ?? this.onBackground,
+        surface: surface ?? this.surface,
+        onSurface: onSurface ?? this.onSurface,
+      );
 
   static ThemeData toThemeData(
     ThemeColors c, {
@@ -205,8 +206,8 @@ class PaletteScope extends StatefulWidget {
   });
 
   static PaletteController of(BuildContext context) {
-    final inherited = context
-        .dependOnInheritedWidgetOfExactType<_PaletteInherited>();
+    final inherited =
+        context.dependOnInheritedWidgetOfExactType<_PaletteInherited>();
     assert(
       inherited != null,
       'PaletteScope.of() called with no PaletteScope in context',
@@ -284,17 +285,17 @@ class PaletteController extends ChangeNotifier {
     ThemeColors seed, {
     required TickerProvider vsync,
     required this.brightness,
-  }) : _current = seed,
-       _target = seed,
-       _anim = AnimationController(
-         vsync: vsync,
-         duration: const Duration(milliseconds: 1),
-       )..value = 1.0;
+  })  : _current = seed,
+        _target = seed,
+        _anim = AnimationController(
+          vsync: vsync,
+          duration: const Duration(milliseconds: 1),
+        )..value = 1.0;
 
   ThemeData get theme => ThemeColors.toThemeData(
-    _lerp(_current, _target, _anim.value),
-    brightness: brightness,
-  );
+        _lerp(_current, _target, _anim.value),
+        brightness: brightness,
+      );
 
   ThemeColors get current => _target;
 
@@ -405,8 +406,7 @@ List<_Swatch> _medianCut(Uint8List rgba, int k) {
   while (boxes.length < desired) {
     // pick the box with largest range
     boxes.sort(
-      (a, b) =>
-          ((b.rangeR() + b.rangeG() + b.rangeB()) -
+      (a, b) => ((b.rangeR() + b.rangeG() + b.rangeB()) -
           (a.rangeR() + a.rangeG() + a.rangeB())),
     );
     final box = boxes.first;
@@ -511,9 +511,10 @@ List<_Scored> _scoreSwatches(List<_Swatch> swatches) {
   for (final s in swatches) {
     // Quick saturation approximation without full CAM16
     final c = s.color;
-    final r = c.r;
-    final g = c.g;
-    final b = c.b;
+    // Use bit operations for compatibility across all Flutter versions
+    final r = (0x00ff0000 & c.value) >> 16;
+    final g = (0x0000ff00 & c.value) >> 8;
+    final b = (0x000000ff & c.value) >> 0;
     final max = math.max(r, math.max(g, b));
     final min = math.min(r, math.min(g, b));
     final saturation = max == 0 ? 0.0 : (max - min) / max;
@@ -522,8 +523,7 @@ List<_Scored> _scoreSwatches(List<_Swatch> swatches) {
     final lumaScore = 1.0 - (2.0 * (lum - 0.5).abs()); // peak at 0.5
 
     // Simplified scoring: prefer saturation and mid-luma
-    final score =
-        (0.7 * saturation) +
+    final score = (0.7 * saturation) +
         (0.2 * lumaScore) +
         (0.1 * math.log(1 + s.population) / math.log(10));
     out.add(_Scored(s, score));
@@ -745,9 +745,10 @@ double _relativeLuminance(Color c) {
         : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
   }
 
-  final r = f((c.r * 255.0).round());
-  final g = f((c.g * 255.0).round());
-  final b = f((c.b * 255.0).round());
+  // Use bit operations for compatibility across all Flutter versions
+  final r = f((0x00ff0000 & c.value) >> 16);
+  final g = f((0x0000ff00 & c.value) >> 8);
+  final b = f((0x000000ff & c.value) >> 0);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 

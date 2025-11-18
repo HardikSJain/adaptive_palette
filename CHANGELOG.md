@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2025-11-18
+
+### Fixed
+- **Critical Fix**: Replaced all color component getters with bit operations for universal compatibility
+- Now uses `Color.value` with bit masking (e.g., `(0x00ff0000 & c.value) >> 16` for red channel)
+- Avoids both deprecated `.red/.green/.blue` getters and unsupported `.r/.g/.b` getters
+- Fixed compilation errors on all Flutter versions from 3.0+ to current
+- Color extraction and WCAG contrast calculations now work correctly across all supported Flutter versions
+
+### Technical Details
+- RGB components extracted directly from 32-bit color value using bit operations
+- More performant (direct bit operations vs method calls)
+- Future-proof implementation independent of Flutter API changes
+
 ## [1.0.4] - 2025-11-16
 
 ### Changed

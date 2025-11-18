@@ -20,7 +20,7 @@ Dynamic theming from images for Flutter. Extract vibrant colors and create acces
 
 ```yaml
 dependencies:
-  adaptive_palette: ^1.0.4
+  adaptive_palette: ^1.0.5
 ```
 
 ## Examples
