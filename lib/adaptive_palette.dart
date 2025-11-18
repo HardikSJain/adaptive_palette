@@ -542,9 +542,9 @@ ThemeColors _buildTheme(
   double minContrast = 4.5,
 }) {
   // Build tonal palettes using HCT around the seed
-  final hct = mcu.Hct.fromInt(seed.toARGB32());
+  final hct = mcu.Hct.fromInt(seed.value);
   final hue = hct.hue;
-  final baseChroma = math.max(24.0, mcu.Cam16.fromInt(seed.toARGB32()).chroma);
+  final baseChroma = math.max(24.0, mcu.Cam16.fromInt(seed.value).chroma);
 
   Color tone(double t) {
     final h = mcu.Hct.from(hue, baseChroma, t);
@@ -571,7 +571,7 @@ ThemeColors _buildTheme(
 
   // On-colors with WCAG guardrails
   Color onFor(Color bg, {double preferTone = 20}) {
-    final bgHct = mcu.Hct.fromInt(bg.toARGB32());
+    final bgHct = mcu.Hct.fromInt(bg.value);
     for (final t in <double>[preferTone, 10, 0, 90, 95, 99]) {
       final candidate = Color(mcu.Hct.from(bgHct.hue, bgHct.chroma, t).toInt());
       if (_contrastRatio(candidate, bg) >= minContrast) {
@@ -604,8 +604,8 @@ ThemeColors _buildTheme(
   Color ensureContrast(Color fg, Color bg) {
     if (_contrastRatio(fg, bg) >= minContrast) return fg;
     // Shift tone using HCT towards contrast
-    final bgHct = mcu.Hct.fromInt(bg.toARGB32());
-    double t = mcu.Hct.fromInt(fg.toARGB32()).tone;
+    final bgHct = mcu.Hct.fromInt(bg.value);
+    double t = mcu.Hct.fromInt(fg.value).tone;
     if (_relativeLuminance(fg) > _relativeLuminance(bg)) {
       // make lighter
       for (final step in [4, 6, 8, 10, 15, 20]) {

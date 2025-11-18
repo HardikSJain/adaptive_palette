@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2025-11-18
+
+### Fixed
+- **Critical Compatibility Fix**: Replaced `toARGB32()` method calls with `.value` property for Flutter 3.0+ compatibility
+- Fixed compilation errors when using package with Flutter versions 3.0-3.26
+- All color conversions now use stable `Color.value` API that works across all Flutter versions
+
+### Changed
+- Updated README requirements to accurately reflect Flutter SDK: >=3.0.0 (previously incorrectly stated >=3.9.2)
+- Documentation now correctly shows support for Flutter 3.0 through current releases
+
+### Technical Details
+- Package now verified to work on Flutter 3.0+ through current versions
+- All color operations use only stable, long-standing APIs
+- Supports approximately 2 years of Flutter releases
+
 ## [1.0.5] - 2025-11-18
 
 ### Fixed
