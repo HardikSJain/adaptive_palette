@@ -142,8 +142,8 @@ class AdaptivePalette {
   static Future<ThemeColors> fromImage(
     ImageProvider provider, {
     Brightness targetBrightness = Brightness.light,
-    int quantizeColors = 24, // Reduced from 48 for speed
-    int resize = 96, // Reduced from 128 for speed
+    int quantizeColors = 32, // Increased for better color detection
+    int resize = 128, // Increased for better accuracy
     double minContrast = 4.5, // WCAG AA small text
   }) async {
     final img = await _imageFromProvider(provider);
@@ -506,30 +506,182 @@ class _Scored {
 }
 
 List<_Scored> _scoreSwatches(List<_Swatch> swatches) {
-  // OPTIMIZED: Simplified scoring to reduce CAM16 calculations
+  // Universal scoring algorithm for ALL image types
+  // Adapts to image characteristics automatically
+  
+  if (swatches.isEmpty) return [];
+  
   final List<_Scored> out = [];
+  
+  // Analyze the entire palette to understand image characteristics
+  final totalPixels = swatches.fold<int>(0, (sum, s) => sum + s.population);
+  final maxPop = swatches.fold<int>(0, (max, s) => math.max(max, s.population));
+  if (maxPop == 0 || totalPixels == 0) return [];
+  
+  // Calculate image statistics for adaptive behavior
+  double avgSaturation = 0.0;
+  double avgChroma = 0.0;
+  
   for (final s in swatches) {
-    // Quick saturation approximation without full CAM16
     final c = s.color;
-    // Use bit operations for compatibility across all Flutter versions
     final r = (0x00ff0000 & c.value) >> 16;
     final g = (0x0000ff00 & c.value) >> 8;
     final b = (0x000000ff & c.value) >> 0;
-    final max = math.max(r, math.max(g, b));
-    final min = math.min(r, math.min(g, b));
-    final saturation = max == 0 ? 0.0 : (max - min) / max;
-
-    final lum = _relativeLuminance(c);
-    final lumaScore = 1.0 - (2.0 * (lum - 0.5).abs()); // peak at 0.5
-
-    // Simplified scoring: prefer saturation and mid-luma
-    final score = (0.7 * saturation) +
-        (0.2 * lumaScore) +
-        (0.1 * math.log(1 + s.population) / math.log(10));
-    out.add(_Scored(s, score));
+    
+    final maxCh = math.max(r, math.max(g, b)) / 255.0;
+    final minCh = math.min(r, math.min(g, b)) / 255.0;
+    final sat = maxCh == 0 ? 0.0 : (maxCh - minCh) / maxCh;
+    
+    final cam = mcu.Cam16.fromInt(c.value);
+    final weight = s.population / totalPixels;
+    
+    avgSaturation += sat * weight;
+    avgChroma += cam.chroma * weight;
   }
+  
+  // Detect image type based on statistics
+  final isColorful = avgSaturation > 0.3 || avgChroma > 25;
+  final isMonochromatic = avgSaturation < 0.15 && avgChroma < 15;
+  final hasFewColors = swatches.length < 8;
+  
+  // Adaptive thresholds based on image type
+  final satThreshold = isMonochromatic ? 0.08 : (isColorful ? 0.18 : 0.12);
+  final chromaThreshold = isMonochromatic ? 5.0 : (isColorful ? 12.0 : 8.0);
+  final toneMin = isMonochromatic ? 12.0 : 15.0;
+  final toneMax = isMonochromatic ? 88.0 : 85.0;
+  
+  for (final s in swatches) {
+    final c = s.color;
+    
+    // Use bit operations for compatibility
+    final r = (0x00ff0000 & c.value) >> 16;
+    final g = (0x0000ff00 & c.value) >> 8;
+    final b = (0x000000ff & c.value) >> 0;
+    
+    // Use CAM16 for perceptually accurate color analysis
+    final cam = mcu.Cam16.fromInt(c.value);
+    final chroma = cam.chroma; // Colorfulness (0-~120)
+    final tone = mcu.Hct.fromInt(c.value).tone; // Lightness (0-100)
+    
+    // HSV saturation
+    final maxCh = math.max(r, math.max(g, b)) / 255.0;
+    final minCh = math.min(r, math.min(g, b)) / 255.0;
+    final saturation = maxCh == 0 ? 0.0 : (maxCh - minCh) / maxCh;
+    
+    // Population score (normalized 0-1)
+    final popScore = s.population / maxPop;
+    
+    // Chroma score (0-1) - Adaptive scaling
+    final chromaScale = isColorful ? 70.0 : 50.0;
+    final chromaScore = math.min(1.0, chroma / chromaScale);
+    
+    // ADAPTIVE FILTERING - Adjust strictness based on image type
+    
+    // 1. Filter near-black (adaptive threshold)
+    if (tone < (hasFewColors ? 8.0 : toneMin)) {
+      out.add(_Scored(s, 0.05 * popScore));
+      continue;
+    }
+    
+    // 2. Filter near-white (adaptive threshold)
+    if (tone > toneMax) {
+      out.add(_Scored(s, 0.05 * popScore));
+      continue;
+    }
+    
+    // 3. Filter low saturation (adaptive - allow grays for monochrome images)
+    if (saturation < satThreshold) {
+      final penalty = isMonochromatic ? 0.50 : 0.20;
+      out.add(_Scored(s, penalty * popScore));
+      continue;
+    }
+    
+    // 4. Filter low chroma (adaptive)
+    if (chroma < chromaThreshold) {
+      final penalty = isMonochromatic ? 0.60 : 0.25;
+      out.add(_Scored(s, penalty * popScore));
+      continue;
+    }
+    
+    // INTELLIGENT SCORING - Adapts to image characteristics
+    
+    // Population weight: Higher for colorful images (where color matters most)
+    final popWeight = isColorful ? 0.55 : (isMonochromatic ? 0.65 : 0.60);
+    
+    // Chroma weight: Higher for colorful images, lower for monochrome
+    final chromaWeight = isColorful ? 0.30 : (isMonochromatic ? 0.15 : 0.25);
+    
+    // Tone weight: Consistent across all image types
+    final toneWeight = 1.0 - popWeight - chromaWeight;
+    
+    // Tone preference score
+    final toneScore = tone >= toneMin && tone <= toneMax
+        ? (tone >= 30 && tone <= 70 ? 1.0 : 0.85)
+        : 0.4;
+    
+    // Base score with adaptive weights
+    final baseScore = (popWeight * popScore) +
+        (chromaWeight * chromaScore) +
+        (toneWeight * toneScore);
+    
+    // CONDITIONAL BOOSTS - Only apply when relevant
+    
+    // Chroma boost: Strong for vibrant colors in colorful images
+    var chromaBoost = 1.0;
+    if (isColorful && chroma > 35) {
+      chromaBoost = 1.0 + math.min(0.5, (chroma - 35) / 70.0);
+    } else if (!isMonochromatic && chroma > 25) {
+      chromaBoost = 1.0 + math.min(0.3, (chroma - 25) / 80.0);
+    }
+    
+    // Mid-tone boost: Prefer visible colors
+    final midToneBoost = (tone >= 30 && tone <= 70) ? 1.2 : 1.0;
+    
+    // Saturation boost: Reward vibrant colors (adaptive strength)
+    var satBoost = 1.0;
+    if (saturation > 0.4) {
+      final boostStrength = isColorful ? 0.6 : 0.3;
+      satBoost = 1.0 + ((saturation - 0.4) * boostStrength);
+    }
+    
+    // Diversity boost: Slightly favor colors that are different from top colors
+    // (Prevents picking 3 shades of the same color)
+    var diversityBoost = 1.0;
+    if (out.isNotEmpty && out.length < 3) {
+      final topColor = out.first.swatch.color;
+      final colorDiff = _colorDistance(c, topColor);
+      if (colorDiff > 40) { // Significantly different color
+        diversityBoost = 1.1;
+      }
+    }
+    
+    // Final score with all boosts applied
+    final finalScore = baseScore * 
+        chromaBoost * 
+        midToneBoost * 
+        satBoost * 
+        diversityBoost;
+    
+    out.add(_Scored(s, finalScore));
+  }
+  
+  // Sort by score (highest first)
   out.sort((a, b) => b.score.compareTo(a.score));
+  
   return out;
+}
+
+// Helper: Calculate perceptual color distance (simplified CAM16 distance)
+double _colorDistance(Color c1, Color c2) {
+  final cam1 = mcu.Cam16.fromInt(c1.value);
+  final cam2 = mcu.Cam16.fromInt(c2.value);
+  
+  final dH = (cam1.hue - cam2.hue).abs();
+  final dC = (cam1.chroma - cam2.chroma).abs();
+  final dJ = (cam1.j - cam2.j).abs(); // Lightness
+  
+  // Simplified perceptual distance
+  return math.sqrt(dH * dH * 0.5 + dC * dC + dJ * dJ * 0.5);
 }
 
 // ------------------------------

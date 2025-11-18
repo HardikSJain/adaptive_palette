@@ -9,18 +9,20 @@ Dynamic theming from images for Flutter. Extract vibrant colors and create acces
 
 ## Features
 
-- **Smart color extraction** - Median-cut quantization finds dominant, vibrant colors
-- **Material Design 3** - Uses CAM16/HCT color space for perceptual accuracy
-- **Accessible by default** - WCAG contrast validation ensures readable text
+- **Intelligent color extraction** - Adaptive algorithm that automatically adjusts to different image types (colorful, monochromatic, or normal)
+- **Perceptual color science** - Uses CAM16/HCT color space for human-eye-accurate color analysis
+- **Material Design 3** - Full M3 theming with tonal palettes and dynamic color
+- **Accessible by default** - WCAG contrast validation ensures readable text (4.5:1 minimum)
 - **Animated transitions** - Smooth theme changes with `PaletteScope`
-- **Performance optimized** - Content-based caching and configurable quality settings
-- **Zero dependencies** - Beyond Flutter and Material Color Utilities
+- **Performance optimized** - Content-based caching, efficient median-cut quantization
+- **Production ready** - Works with all image types: photos, products, landscapes, UI screenshots
+- **Flutter 3.0+ compatible** - Supports ~2 years of Flutter releases
 
 ## Installation
 
 ```yaml
 dependencies:
-  adaptive_palette: ^1.0.6
+  adaptive_palette: ^1.0.7
 ```
 
 ## Examples

@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2025-11-18
+
+### Changed
+- **Major Algorithm Improvement**: Completely redesigned color scoring algorithm for superior dominant color detection
+- Algorithm now adapts intelligently to different image types (colorful, monochromatic, normal)
+- Increased default `quantizeColors` from 24 to 32 for better color detection accuracy
+- Increased default `resize` from 96 to 128 for improved color extraction quality
+
+### Improved
+- **Adaptive Intelligence**: Automatically detects image characteristics and adjusts scoring weights
+  - Colorful images: Prioritizes population (55%) and chroma (30%)
+  - Monochromatic images: Focuses on population (65%), accepts grayscale colors
+  - Normal images: Balanced approach with 60% population, 25% chroma
+- **Perceptual Color Science**: Now uses CAM16 chroma and HCT tone for human-eye-accurate color analysis
+- **Smart Filtering**: Adaptive thresholds automatically adjust based on image type
+  - Aggressive filtering of backgrounds (blacks, whites) in colorful images
+  - Relaxed filtering for monochrome/grayscale images
+- **Color Diversity**: Prevents selecting multiple shades of the same color
+- **Better Boosts**: Conditional boosts for vibrant colors, mid-tones, and saturation only when relevant
+
+### Technical Details
+- Uses CAM16 perceptual color space for chroma and hue distance calculations
+- Population-weighted scoring (55-65% depending on image type)
+- Adaptive saturation thresholds (0.08 for monochrome, 0.12-0.18 for others)
+- Perceptual color distance function prevents similar color selection
+- All changes maintain full Flutter 3.0+ compatibility with bit operations
+
+### Performance
+- Optimized for real-world images: event photos, product shots, landscapes, UI screenshots, food photos
+- Works correctly with dynamic image sources of varying characteristics
+
 ## [1.0.6] - 2025-11-18
 
 ### Fixed
