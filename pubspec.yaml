@@ -1,6 +1,6 @@
 name: adaptive_palette
-description: Dynamic theming from images for Flutter. Extract vibrant colors and create accessible Material Design 3 themes with Luma/Spotify-style blurred backgrounds.
-version: 1.0.7
+description: Production-ready dynamic theming from images. Intelligent color extraction with quality presets, performance monitoring, and Spotify/YouTube-style widgets. Material Design 3 with WCAG accessibility.
+version: 2.0.0
 homepage: https://github.com/HardikSJain/adaptive_palette
 repository: https://github.com/HardikSJain/adaptive_palette
 issue_tracker: https://github.com/HardikSJain/adaptive_palette/issues

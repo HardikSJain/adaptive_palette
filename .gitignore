@@ -30,8 +30,8 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
-/coverage/
+build/
+coverage/
 
 # Symbolication related
 app.*.symbols
@@ -43,3 +43,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Example app - exclude unnecessary files for pub.dev
+example/.metadata
+example/.flutter-plugins-dependencies
+example/pubspec.lock
+example/android/
+example/ios/
+example/web/
+example/macos/
+example/windows/
+example/linux/
+example/.idea/
+example/*.iml
+example/test/widget_test.dart

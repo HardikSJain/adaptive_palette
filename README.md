@@ -17,6 +17,7 @@ Dynamic theming from images for Flutter. Extract vibrant colors and create acces
 - **Performance optimized** - Content-based caching, efficient median-cut quantization
 - **Production ready** - Works with all image types: photos, products, landscapes, UI screenshots
 - **Flutter 3.0+ compatible** - Supports ~2 years of Flutter releases
+- **Hero-ready widgets** - Drop-in overlay/glow/scaffold widgets for Spotify, YouTube, and Luma-style UIs
 
 ## Installation
 
@@ -51,6 +52,95 @@ final colors = await AdaptivePalette.fromImage(
 
 // colors contains: primary, secondary, background, surface, and their on-colors
 ```
+
+## Adaptive Palette - Image Overlay Template
+
+Build Spotify/Luma-style overlays without wiring anything yourself. The package now ships with three drop-in widgets:
+
+1. **`AdaptiveImageOverlay`** – hero/playlist cards with adaptive gradients.
+2. **`AdaptiveGlowImageFrame`** – YouTube-style border glow pulled from image colors.
+3. **`AdaptiveGradientScaffold`** – fills an entire screen background with the image palette.
+
+### AdaptiveImageOverlay
+
+```dart
+AdaptiveImageOverlay.network(
+  'https://picsum.photos/1600/900',
+  overlayStyle: const AdaptiveOverlayStyle(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    stops: [0.0, 0.4, 0.7, 1.0],
+    opacities: [0.95, 0.65, 0.25, 0.0],
+  ),
+  borderRadius: BorderRadius.circular(28),
+  padding: const EdgeInsets.all(32),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: const [
+      Text('Gradient Overlay', style: TextStyle(fontSize: 24)),
+      SizedBox(height: 12),
+      Text('Drop this on any hero image to mirror Spotify/Luma.'),
+    ],
+  ),
+);
+```
+
+### AdaptiveGlowImageFrame
+
+```dart
+AdaptiveGlowImageFrame.network(
+  'https://picsum.photos/2000/1100',
+  aspectRatio: 21 / 9,
+  blurRadius: 48,
+  spreadRadius: 10,
+  tone: AdaptiveOverlayTone.secondary,
+);
+```
+
+### AdaptiveGradientScaffold
+
+```dart
+AdaptiveGradientScaffold.network(
+  'https://picsum.photos/1800/1200',
+  appBar: AppBar(
+    title: const Text('Adaptive Palette Overlay Kit'),
+    backgroundColor: Colors.transparent,
+  ),
+  body: ListView(children: const [Text('Your content here')]),
+);
+```
+
+Wrap your app with `PaletteScope` and the scaffold will automatically drive your Material theme (set `syncWithPaletteScope: false` if you want manual control). Each widget also exposes `onColorsReady` so you can tap into the extracted palette.
+
+`AdaptiveOverlayStyle` powers all three widgets. Use it to change gradient direction, tone (primary/secondary/surface/background), or provide explicit `colors` if you want a custom ramp.
+
+### Gradient Patterns
+
+Left-to-right hero overlay:
+
+```dart
+const AdaptiveOverlayStyle(
+  begin: Alignment.centerLeft,
+  end: Alignment.center,
+  stops: [0.0, 0.4, 0.7, 1.0],
+  opacities: [0.9, 0.6, 0.3, 0.0],
+)
+```
+
+Diagonal accent overlay:
+
+```dart
+const AdaptiveOverlayStyle(
+  begin: Alignment.bottomLeft,
+  end: Alignment.topRight,
+  stops: [0.0, 0.45, 1.0],
+  opacities: [0.95, 0.45, 0.0],
+  tone: AdaptiveOverlayTone.secondary,
+)
+```
+
+> See `example/lib/image_overlay_template.dart` or run `flutter run -t lib/image_overlay_template.dart` inside `example/` to try all three black-box widgets together.
 
 ## Usage
 
@@ -239,6 +329,29 @@ controller.animateTo(
   curve: Curves.easeOutCubic,
 );
 ```
+
+### AdaptiveOverlayStyle
+
+Generate gradient overlays directly from `ThemeColors`.
+
+```dart
+final gradient = colors.overlayGradient(
+  style: const AdaptiveOverlayStyle(
+    begin: Alignment.bottomLeft,
+    end: Alignment.topRight,
+    stops: [0.0, 0.5, 1.0],
+    opacities: [0.9, 0.45, 0.0],
+    tone: AdaptiveOverlayTone.secondary,
+  ),
+);
+```
+
+**Parameters:**
+- `begin` / `end` - gradient direction
+- `stops` & `opacities` - control color falloff
+- `tone` - choose which palette tone powers the overlay (primary/secondary/surface/background)
+- `colors` - optional list of explicit colors if you need multi-tone gradients
+- `colorOverride` - inject a custom base color while still using the adaptive opacity curve
 
 ## How It Works
 
