@@ -87,7 +87,8 @@ class ExtractionConfig {
     this.onError,
   })  : assert(quantizeColors >= 8 && quantizeColors <= 64,
             'quantizeColors must be between 8 and 64'),
-        assert(resize >= 64 && resize <= 256, 'resize must be between 64 and 256'),
+        assert(
+            resize >= 64 && resize <= 256, 'resize must be between 64 and 256'),
         assert(minContrast >= 3.0 && minContrast <= 21.0,
             'minContrast must be between 3.0 and 21.0'),
         assert(diversityWeight >= 0.0 && diversityWeight <= 2.0,

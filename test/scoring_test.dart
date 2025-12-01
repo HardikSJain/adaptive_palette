@@ -103,7 +103,8 @@ void main() {
       final colorfulWeights = getAdaptiveWeights(colorful);
       final monoWeights = getAdaptiveWeights(mono);
 
-      expect(colorfulWeights.chromaWeight, greaterThan(monoWeights.chromaWeight));
+      expect(
+          colorfulWeights.chromaWeight, greaterThan(monoWeights.chromaWeight));
       expect(colorfulWeights.popWeight, lessThan(monoWeights.popWeight));
     });
 

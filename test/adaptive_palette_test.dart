@@ -45,8 +45,7 @@ void main() {
 
     test('quality presets are valid', () {
       final fast = ExtractionConfig.fromQuality(ExtractionQuality.fast);
-      final balanced =
-          ExtractionConfig.fromQuality(ExtractionQuality.balanced);
+      final balanced = ExtractionConfig.fromQuality(ExtractionQuality.balanced);
       final high = ExtractionConfig.fromQuality(ExtractionQuality.high);
 
       expect(fast.quantizeColors, lessThan(balanced.quantizeColors));
@@ -135,7 +134,7 @@ void main() {
 
     test('colorOverride takes precedence', () {
       const colors = ThemeColors.fallback();
-      const override = Color(0xFFE91E63);  // Pink value
+      const override = Color(0xFFE91E63); // Pink value
 
       final gradient = const AdaptiveOverlayStyle(
         colorOverride: override,

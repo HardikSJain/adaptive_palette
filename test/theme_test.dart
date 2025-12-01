@@ -123,7 +123,8 @@ void main() {
       final result = ensureContrast(fg, bg, 4.5);
 
       // Result should be lighter than original
-      expect(relativeLuminance(result), greaterThanOrEqualTo(relativeLuminance(fg)));
+      expect(relativeLuminance(result),
+          greaterThanOrEqualTo(relativeLuminance(fg)));
     });
 
     test('makes dark colors darker', () {
@@ -132,7 +133,8 @@ void main() {
       final result = ensureContrast(fg, bg, 4.5);
 
       // Result should be darker than original
-      expect(relativeLuminance(result), lessThanOrEqualTo(relativeLuminance(fg)));
+      expect(
+          relativeLuminance(result), lessThanOrEqualTo(relativeLuminance(fg)));
     });
   });
 
@@ -192,7 +194,7 @@ void main() {
 
     test('respects minContrast parameter', () {
       final themeAA = buildTheme(
-        Colors.blue,  // Use blue for more predictable contrast
+        Colors.blue, // Use blue for more predictable contrast
         targetBrightness: Brightness.light,
         minContrast: 4.5, // WCAG AA
       );
@@ -203,13 +205,12 @@ void main() {
         minContrast: 7.0, // WCAG AAA
       );
 
-      final ratioAA =
-          computeContrastRatio(themeAA.onPrimary, themeAA.primary);
+      final ratioAA = computeContrastRatio(themeAA.onPrimary, themeAA.primary);
       final ratioAAA =
           computeContrastRatio(themeAAA.onPrimary, themeAAA.primary);
 
       // Check that constraints are met (with small tolerance for rounding)
-      expect(ratioAA, greaterThan(4.3));  // Slightly relaxed for edge cases
+      expect(ratioAA, greaterThan(4.3)); // Slightly relaxed for edge cases
       expect(ratioAAA, greaterThan(6.8)); // Slightly relaxed for edge cases
 
       // AAA should have higher contrast than AA
@@ -294,9 +295,9 @@ void main() {
     test('lerp at 1.0 returns to', () {
       const from = ThemeColors.fallback();
       final to = ThemeColors(
-        primary: Color(0xFFF44336),  // Red value
+        primary: Color(0xFFF44336), // Red value
         onPrimary: Colors.white,
-        secondary: Color(0xFF2196F3),  // Blue value
+        secondary: Color(0xFF2196F3), // Blue value
         onSecondary: Colors.white,
         background: Colors.black,
         onBackground: Colors.white,

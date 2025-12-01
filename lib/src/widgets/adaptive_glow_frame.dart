@@ -134,8 +134,7 @@ class _AdaptiveGlowImageFrameState extends State<AdaptiveGlowImageFrame> {
       final t = (i + 1) / widget.layers;
       layers.add(
         BoxShadow(
-          color: Color.lerp(base, secondary, t)!
-              .withOpacity(0.35 - (0.1 * i)),
+          color: Color.lerp(base, secondary, t)!.withOpacity(0.35 - (0.1 * i)),
           blurRadius: widget.blurRadius * (1 + 0.6 * i),
           spreadRadius: widget.spreadRadius * (1 + 0.3 * i),
         ),

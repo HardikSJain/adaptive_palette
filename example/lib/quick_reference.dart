@@ -110,7 +110,8 @@ Widget spotifyCard() {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('Title', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+        Text('Title',
+            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
         SizedBox(height: 8),
         Text('Subtitle'),
       ],
@@ -410,7 +411,8 @@ Widget wrongExample2() {
       return FutureBuilder(
         future: AdaptivePalette.fromImage(
           NetworkImage('thumb$index.jpg'),
-          config: ExtractionConfig.fromQuality(ExtractionQuality.high), // ❌ Overkill!
+          config: ExtractionConfig.fromQuality(
+              ExtractionQuality.high), // ❌ Overkill!
         ),
         builder: (context, snapshot) => Container(),
       );
@@ -429,7 +431,8 @@ Widget correctExample2() {
       return FutureBuilder(
         future: AdaptivePalette.fromImage(
           NetworkImage('thumb$index.jpg'),
-          config: ExtractionConfig.fromQuality(ExtractionQuality.fast), // ✅ Fast!
+          config:
+              ExtractionConfig.fromQuality(ExtractionQuality.fast), // ✅ Fast!
         ),
         builder: (context, snapshot) => Container(),
       );

@@ -596,7 +596,8 @@ class _PerformanceMonitoringExampleState
         Text('Extractions: ${_stats.length}'),
         Text('Cache hit rate: ${_calculateCacheHitRate().toStringAsFixed(1)}%'),
         if (_stats.isNotEmpty)
-          Text('Avg duration: ${_stats.map((s) => s.duration.inMilliseconds).reduce((a, b) => a + b) ~/ _stats.length}ms'),
+          Text(
+              'Avg duration: ${_stats.map((s) => s.duration.inMilliseconds).reduce((a, b) => a + b) ~/ _stats.length}ms'),
       ],
     );
   }
