@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-flutter-blue.svg)](https://flutter.dev)
 
-![Adaptive Palette Demo](adaptive_palette.png)
+![Adaptive Palette Demo](https://raw.githubusercontent.com/HardikSJain/adaptive_palette/main/adaptive_palette.png)
 
 Dynamic theming from images for Flutter. Extract vibrant colors and create accessible Material Design 3 themes with Spotify/Luma-style adaptive backgrounds.
 
