@@ -10,8 +10,10 @@ import 'widget_helpers.dart';
 
 /// Builds a YouTube-style glow/border shadow derived from image colors.
 ///
-/// Perfect for thumbnail frames, featured content, or any image that
-/// needs a colorful glow effect.
+/// **DEPRECATED**: Use [FluidBackground] instead for immersive animated backgrounds.
+///
+/// This widget is maintained for backward compatibility but will be removed in v4.0.0.
+/// Migrate to FluidBackground for better performance and visual quality.
 ///
 /// Example:
 /// ```dart
@@ -23,6 +25,7 @@ import 'widget_helpers.dart';
 ///   tone: AdaptiveOverlayTone.secondary,
 /// )
 /// ```
+@Deprecated('Use FluidBackground instead. Will be removed in v4.0.0')
 class AdaptiveGlowImageFrame extends StatefulWidget {
   final ImageProvider imageProvider;
   final double aspectRatio;

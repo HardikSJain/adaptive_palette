@@ -1,68 +1,71 @@
-/// Spotify/Luma-style dynamic theming from an image with contrast guardrails.
+/// Immersive fluid animated backgrounds from images with intelligent color extraction.
 ///
 /// # Features
 ///
-/// - **Intelligent color extraction** - Adaptive algorithm automatically adjusts to image types
-/// - **Perceptual color science** - Uses CAM16/HCT color space for accurate analysis
-/// - **Material Design 3** - Full M3 theming with tonal palettes
-/// - **Accessible by default** - WCAG contrast validation ensures readable text
-/// - **Animated transitions** - Smooth theme changes with PaletteScope
-/// - **Performance optimized** - Content-based caching, efficient quantization
-/// - **Ready-made widgets** - Drop-in overlays for Spotify/YouTube-style UIs
+/// - **Fluid animated backgrounds** - Layered image shaders with orbital motion and heavy blur
+/// - **Intelligent color extraction** - Weighted k-means clustering for accurate palette generation
+/// - **Smooth transitions** - Cross-fade between images with palette color tweening
+/// - **Corner accent glows** - Radial gradients using extracted colors
+/// - **Matte treatment** - Prevents harsh whites, ensures rich vibrant colors
+/// - **Performance optimized** - Instant fallback, background extraction, efficient rendering
 ///
-/// # Quick Start
+/// # Quick Start - FluidBackground Widget
+///
+/// The easiest way - widget handles everything automatically:
 ///
 /// ```dart
 /// import 'package:adaptive_palette/adaptive_palette.dart';
 ///
-/// // Extract colors from any ImageProvider
-/// final colors = await AdaptivePalette.fromImage(
-///   NetworkImage('https://example.com/image.jpg'),
-///   targetBrightness: Brightness.dark,
-/// );
-///
-/// // Or use quality presets
-/// final colors = await AdaptivePalette.fromImage(
-///   image,
-///   config: ExtractionConfig.fromQuality(ExtractionQuality.high),
-/// );
-/// ```
-///
-/// # Usage with PaletteScope
-///
-/// ```dart
-/// return PaletteScope(
-///   seed: ThemeColors.fallback(),
-///   brightness: Brightness.dark,
-///   child: MaterialApp(
-///     theme: PaletteScope.of(context).theme,
-///     home: MyHomePage(),
+/// FluidBackground(
+///   imageProvider: NetworkImage('https://example.com/album.jpg'),
+///   child: Scaffold(
+///     backgroundColor: Colors.transparent,
+///     body: YourContent(),
 ///   ),
-/// );
+/// )
 /// ```
 ///
-/// # Pre-built Widgets
+/// # Quick Start - Manual Color Extraction
+///
+/// For custom implementations:
 ///
 /// ```dart
-/// // Spotify-style hero overlay
-/// AdaptiveImageOverlay.network(
-///   'https://example.com/cover.jpg',
-///   child: Text('Your content'),
-/// )
+/// import 'package:adaptive_palette/adaptive_palette.dart';
 ///
-/// // YouTube-style glow border
-/// AdaptiveGlowImageFrame.network(
-///   'https://example.com/thumbnail.jpg',
-///   blurRadius: 48,
-/// )
+/// // Extract palette from image
+/// final image = await loadImageFromProvider(NetworkImage(url));
+/// final palette = await FluidPaletteExtractor.extract(image);
 ///
-/// // Full-screen adaptive background
-/// AdaptiveGradientScaffold.network(
-///   'https://example.com/hero.jpg',
-///   appBar: AppBar(title: Text('Details')),
-///   body: YourContent(),
+/// // Use colors
+/// Container(color: palette.baseDark);       // Dark base
+/// Container(color: palette.accent1);        // Top-left glow
+/// Container(color: palette.accent2);        // Top-right glow
+/// Container(color: palette.accent3);        // Bottom-left glow
+/// Container(color: palette.accent4);        // Bottom-right glow
+/// ```
+///
+/// # Full Configuration
+///
+/// ```dart
+/// FluidBackground(
+///   imageProvider: imageUrl == null ? null : NetworkImage(imageUrl),
+///   blurSigma: 80,              // Blur intensity (60-120)
+///   overlayDarken: 0.10,         // Dark overlay for legibility (0.05-0.20)
+///   animate: true,               // Enable orbital motion
+///   transitionDuration: Duration(milliseconds: 1400),
+///   child: YourContent(),
 /// )
 /// ```
+///
+/// # How It Works
+///
+/// 1. Shows matte gradient fallback instantly
+/// 2. Loads image and extracts FluidPalette in background
+/// 3. Cross-fades from fallback to extracted colors (1400ms)
+/// 4. Renders 4 layered ImageShaders with different scales/rotations
+/// 5. Applies heavy 80σ Gaussian blur for atmospheric effect
+/// 6. Adds corner radial glows using accent colors
+/// 7. Overlays subtle dark layer for white text legibility
 library;
 
 import 'dart:async';
@@ -80,18 +83,61 @@ import 'src/palette_scope.dart';
 import 'src/scoring.dart';
 import 'src/theme.dart';
 
-// Public exports
+// ==================== PRIMARY API ====================
+// These are the main APIs you should use:
+
+/// Load ui.Image from ImageProvider for color extraction
+export 'src/extraction.dart' show loadImageFromProvider;
+
+/// FluidPaletteExtractor - Extract colors from images
+export 'src/fluid_extractor.dart';
+
+/// FluidPalette - Color palette model (baseDark + 4 accents)
+export 'src/fluid_palette.dart';
+
+/// FluidBackground - Immersive animated background widget
+export 'src/widgets/fluid_background.dart';
+
+// ==================== DEPRECATED (will be removed in v4.0.0) ====================
+// These APIs are maintained for backward compatibility only.
+// Migrate to FluidBackground and FluidPaletteExtractor instead.
+
+/// @deprecated Use FluidPaletteExtractor instead
 export 'src/config.dart';
+
+/// @deprecated Use FluidPalette instead
 export 'src/models.dart';
+
+/// @deprecated No replacement - use FluidBackground directly
 export 'src/palette_scope.dart';
+
+/// @deprecated Use FluidBackground instead
 export 'src/widgets/adaptive_glow_frame.dart';
+
+/// @deprecated Use FluidBackground instead
 export 'src/widgets/adaptive_gradient_scaffold.dart';
+
+/// @deprecated Use FluidBackground instead
 export 'src/widgets/adaptive_image_overlay.dart';
 
 /// Main API for extracting adaptive color palettes from images.
 ///
-/// This class provides the primary interface for color extraction with
-/// intelligent algorithm that adapts to different image types.
+/// **DEPRECATED**: Use [FluidPaletteExtractor] instead for color extraction.
+///
+/// This class is maintained for backward compatibility but will be removed in v4.0.0.
+/// Migrate to FluidPaletteExtractor for better color accuracy and performance.
+///
+/// Old usage:
+/// ```dart
+/// final colors = await AdaptivePalette.fromImage(NetworkImage(url));
+/// ```
+///
+/// New usage:
+/// ```dart
+/// final image = await loadImageFromProvider(NetworkImage(url));
+/// final palette = await FluidPaletteExtractor.extract(image);
+/// ```
+@Deprecated('Use FluidPaletteExtractor.extract() instead. Will be removed in v4.0.0')
 class AdaptivePalette {
   AdaptivePalette._(); // Private constructor - all methods are static
 

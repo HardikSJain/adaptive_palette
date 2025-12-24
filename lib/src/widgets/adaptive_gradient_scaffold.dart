@@ -11,8 +11,10 @@ import 'widget_helpers.dart';
 
 /// Full-screen scaffold that paints an adaptive gradient background.
 ///
-/// Perfect for detail pages, album views, or any screen that should
-/// be themed to match an image.
+/// **DEPRECATED**: Use [FluidBackground] instead for immersive animated backgrounds.
+///
+/// This widget is maintained for backward compatibility but will be removed in v4.0.0.
+/// Migrate to FluidBackground for better performance and visual quality.
 ///
 /// Example:
 /// ```dart
@@ -23,6 +25,7 @@ import 'widget_helpers.dart';
 ///   syncWithPaletteScope: true, // Drives app-wide theme
 /// )
 /// ```
+@Deprecated('Use FluidBackground instead. Will be removed in v4.0.0')
 class AdaptiveGradientScaffold extends StatefulWidget {
   final ImageProvider imageProvider;
   final AdaptiveOverlayStyle gradientStyle;

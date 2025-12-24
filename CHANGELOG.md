@@ -5,6 +5,114 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2025-12-24
+
+### Major Release - Complete Redesign
+
+This release completely redesigns the package around a single, powerful concept: **FluidBackground**. The focus is now exclusively on creating immersive, fluid animated backgrounds inspired by modern music apps.
+
+**All v2.x APIs are deprecated and will be removed in v4.0.0.**
+
+### New Philosophy
+
+The package now provides two simple APIs:
+
+1. **FluidBackground Widget** - Drop-in animated background (recommended)
+2. **FluidPaletteExtractor** - Manual color extraction for custom implementations
+
+Old Material Design theming APIs (AdaptivePalette, PaletteScope, ThemeColors, etc.) are deprecated in favor of this simpler, more focused approach.
+
+### Added
+
+- **FluidBackground Widget**: One-line immersive animated backgrounds
+  - Optional image (null = matte fallback only)
+  - Instant matte gradient display (0ms startup)
+  - Smooth cross-fade transitions (1400ms)
+  - 4 layered ImageShaders with orbital motion
+  - Heavy 80σ Gaussian blur for atmosphere
+  - Corner radial glows (4 accents)
+  - Configurable parameters (blur, overlay, animation)
+
+- **FluidPaletteExtractor API**: Advanced color extraction
+  - Weighted k-means clustering (k=6, 10 iterations)
+  - Smart sampling (every 10th pixel, filters extremes)
+  - Vibrancy weighting: (sat × 0.75 + light × 0.25)
+  - Center proximity boost: 1.0 + 0.8 × decay
+  - Perceptual scoring: (vivid × 1.2 + mid × 0.8)
+  - Matte treatment (14% gray blend for whites)
+  - Dark base enforcement (≤ 0.22 lightness)
+
+- **FluidPalette Model**: Simple 5-color palette
+  - `baseDark` (guaranteed dark)
+  - `accent1-4` (corner glows)
+  - `lerp()` for animations
+  - `copyWith()` for immutability
+
+### Deprecated
+
+**All of these will be removed in v4.0.0:**
+
+- ❌ `AdaptivePalette.fromImage()` → Use `FluidPaletteExtractor.extract()`
+- ❌ `PaletteScope` → Use `FluidBackground` widget
+- ❌ `ThemeColors` → Use `FluidPalette`
+- ❌ `AdaptiveImageOverlay` → Use `FluidBackground`
+- ❌ `AdaptiveGlowImageFrame` → Use `FluidBackground`
+- ❌ `AdaptiveGradientScaffold` → Use `FluidBackground`
+- ❌ `ExtractionConfig` → No longer needed
+- ❌ `ExtractionQuality` → No longer needed
+
+### Migration Guide
+
+**Before (v2.x):**
+```dart
+final colors = await AdaptivePalette.fromImage(NetworkImage(url));
+MaterialApp(theme: colors.toThemeData());
+```
+
+**After (v3.0):**
+```dart
+FluidBackground(
+  imageProvider: NetworkImage(url),
+  child: YourContent(),
+)
+```
+
+Or for manual extraction:
+```dart
+final image = await loadImageFromProvider(NetworkImage(url));
+final palette = await FluidPaletteExtractor.extract(image);
+```
+
+### Changed
+
+- **README** - Completely rewritten to focus on FluidBackground
+- **Library docs** - Simplified to showcase two main APIs
+- **Package description** - Now emphasizes fluid backgrounds
+- **Export order** - Primary APIs first, deprecated APIs last
+
+### Why the Change?
+
+The v2.x APIs were complex and trying to solve too many problems:
+- Material Design theming
+- WCAG accessibility
+- Multiple widget variants
+- Theme animation systems
+
+v3.0 simplifies everything:
+- **One goal**: Beautiful fluid backgrounds
+- **Two APIs**: Widget (easy) or Extractor (custom)
+- **Zero complexity**: No configs, no quality presets, no theme systems
+
+### Backward Compatibility
+
+All v2.x code continues to work with deprecation warnings. You have until v4.0 to migrate.
+
+### Breaking Changes
+
+None - all v2.x APIs still work (deprecated but functional).
+
+---
+
 ## [2.0.3] - 2025-12-21
 
 ### Fixed
@@ -150,6 +258,7 @@ Typical extraction times (MacBook Pro M1, Release mode):
 
 ---
 
+[3.0.0]: https://github.com/HardikSJain/adaptive_palette/releases/tag/v3.0.0
 [2.0.3]: https://github.com/HardikSJain/adaptive_palette/releases/tag/v2.0.3
 [2.0.2]: https://github.com/HardikSJain/adaptive_palette/releases/tag/v2.0.2
 [2.0.1]: https://github.com/HardikSJain/adaptive_palette/releases/tag/v2.0.1

@@ -11,8 +11,10 @@ import 'widget_helpers.dart';
 /// Ready-made hero/card widget that paints an adaptive gradient overlay
 /// across an image.
 ///
-/// Perfect for Spotify-style playlist covers, hero images, or cards where
-/// text needs to be readable over the image.
+/// **DEPRECATED**: Use [FluidBackground] instead for immersive animated backgrounds.
+///
+/// This widget is maintained for backward compatibility but will be removed in v4.0.0.
+/// Migrate to FluidBackground for better performance and visual quality.
 ///
 /// Example:
 /// ```dart
@@ -27,6 +29,7 @@ import 'widget_helpers.dart';
 ///   child: Text('Your content here'),
 /// )
 /// ```
+@Deprecated('Use FluidBackground instead. Will be removed in v4.0.0')
 class AdaptiveImageOverlay extends StatefulWidget {
   final ImageProvider imageProvider;
   final AdaptiveOverlayStyle overlayStyle;
