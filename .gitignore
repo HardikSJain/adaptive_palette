@@ -57,3 +57,6 @@ example/linux/
 example/.idea/
 example/*.iml
 example/test/widget_test.dart
+
+# FVM Version Cache
+.fvm/

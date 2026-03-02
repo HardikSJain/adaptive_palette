@@ -7,11 +7,12 @@ issue_tracker: https://github.com/HardikSJain/adaptive_palette/issues
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.24.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  material_color_utilities: ^0.11.1
+  material_color_utilities: ^0.13.0
   crypto: ^3.0.3
   cached_network_image: ^3.4.1
   path_provider: ^2.1.5
