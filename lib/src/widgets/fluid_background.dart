@@ -116,6 +116,7 @@ class _FluidBackgroundState extends State<FluidBackground>
 
   double _frozenMotionT = 0.35;
   int _motionSession = 0;
+  int _loadSession = 0;
 
   late final AnimationController _revealController = AnimationController(
     vsync: this,
@@ -193,6 +194,8 @@ class _FluidBackgroundState extends State<FluidBackground>
   }
 
   void _kickLoad() {
+    final int loadToken = ++_loadSession;
+
     _revealController.value = 0;
     _image = null;
     _palette = null;
@@ -202,15 +205,15 @@ class _FluidBackgroundState extends State<FluidBackground>
       setState(() {});
       return;
     }
-    _load(provider);
+    _load(provider, loadToken: loadToken);
   }
 
-  Future<void> _load(ImageProvider provider) async {
+  Future<void> _load(ImageProvider provider, {required int loadToken}) async {
     try {
       final ui.Image img = await loadImageFromProvider(provider);
       final FluidPalette pal = await FluidPaletteExtractor.extract(img);
 
-      if (!mounted) return;
+      if (!mounted || loadToken != _loadSession) return;
       setState(() {
         _image = img;
         _palette = pal;
@@ -218,7 +221,7 @@ class _FluidBackgroundState extends State<FluidBackground>
 
       await _revealController.forward(from: 0);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || loadToken != _loadSession) return;
       _image = null;
       _palette = null;
       setState(() {});
