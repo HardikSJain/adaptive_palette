@@ -61,7 +61,7 @@ class FluidBackground extends StatefulWidget {
     required this.child,
     this.blurSigma = 80,
     this.overlayDarken = 0.10,
-    this.animate = true,
+    this.animate = false,
     this.transitionDuration = const Duration(milliseconds: 1400),
   });
 
@@ -89,7 +89,7 @@ class FluidBackground extends StatefulWidget {
   /// Enable slow orbital motion animation.
   ///
   /// When true, shader layers slowly rotate and translate (12s cycle).
-  /// Default: true
+  /// Default: false (battery-friendly, deterministic fallback)
   final bool animate;
 
   /// Duration for palette color transitions.
@@ -107,10 +107,15 @@ class _FluidBackgroundState extends State<FluidBackground>
   ui.Image? _image;
   FluidPalette? _palette;
 
+  static const Duration _motionDuration = Duration(seconds: 12);
+
   late final AnimationController _motionController = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 12),
+    duration: _motionDuration,
   );
+
+  double _frozenMotionT = 0.35;
+  int _motionSession = 0;
 
   late final AnimationController _revealController = AnimationController(
     vsync: this,
@@ -122,7 +127,9 @@ class _FluidBackgroundState extends State<FluidBackground>
   @override
   void initState() {
     super.initState();
-    if (widget.animate) _motionController.repeat();
+    if (widget.animate) {
+      _resumeMotionFromFrozen();
+    }
     _kickLoad();
   }
 
@@ -132,15 +139,50 @@ class _FluidBackgroundState extends State<FluidBackground>
 
     if (oldWidget.animate != widget.animate) {
       if (widget.animate) {
-        _motionController.repeat();
+        _resumeMotionFromFrozen();
       } else {
-        _motionController.stop();
+        _freezeMotion();
       }
+      if (mounted) setState(() {});
     }
 
     if (oldWidget.imageProvider != widget.imageProvider) {
       _kickLoad();
     }
+  }
+
+  void _freezeMotion() {
+    _motionSession++;
+    _frozenMotionT = _motionController.value;
+    _motionController.stop(canceled: false);
+  }
+
+  void _resumeMotionFromFrozen() {
+    final int session = ++_motionSession;
+
+    _motionController.value = _frozenMotionT;
+    final remaining = (1.0 - _frozenMotionT).clamp(0.0, 1.0).toDouble();
+
+    if (remaining <= 0.0001) {
+      _motionController.repeat();
+      return;
+    }
+
+    final remainingMs =
+        (_motionDuration.inMilliseconds * remaining).round().clamp(1, 600000);
+
+    _motionController
+        .animateTo(
+          1.0,
+          duration: Duration(milliseconds: remainingMs),
+          curve: Curves.linear,
+        )
+        .then((_) {
+      if (!mounted || !widget.animate || session != _motionSession) return;
+      _motionController.repeat();
+    }).catchError((_) {
+      // Safe to ignore ticker cancellation during rapid animate toggles.
+    });
   }
 
   @override
@@ -186,7 +228,7 @@ class _FluidBackgroundState extends State<FluidBackground>
   @override
   Widget build(BuildContext context) {
     final FluidPalette target = _palette ?? _fallbackPalette;
-    final double tMotion = widget.animate ? _motionController.value : 0.35;
+    final double tMotion = widget.animate ? _motionController.value : _frozenMotionT;
 
     return Scaffold(
       backgroundColor: _fallbackPalette.baseDark,
