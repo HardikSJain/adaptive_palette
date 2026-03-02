@@ -11,6 +11,18 @@ import '../extraction.dart';
 import '../fluid_extractor.dart';
 import '../fluid_palette.dart';
 
+/// Fallback palette mode when image is unavailable or extraction fails.
+enum FluidFallbackMode {
+  /// Always use the dark fallback palette.
+  dark,
+
+  /// Always use the light fallback palette.
+  light,
+
+  /// Match fallback palette to [Theme.of(context).brightness].
+  auto,
+}
+
 /// Immersive animated background widget inspired by modern music apps.
 ///
 /// Features:
@@ -62,6 +74,7 @@ class FluidBackground extends StatefulWidget {
     this.blurSigma = 80,
     this.overlayDarken = 0.10,
     this.animate = false,
+    this.fallbackMode = FluidFallbackMode.auto,
     this.transitionDuration = const Duration(milliseconds: 1400),
   });
 
@@ -91,6 +104,11 @@ class FluidBackground extends StatefulWidget {
   /// When true, shader layers slowly rotate and translate (12s cycle).
   /// Default: false (battery-friendly, deterministic fallback)
   final bool animate;
+
+  /// Fallback palette mode when image is missing or extraction fails.
+  ///
+  /// Default: [FluidFallbackMode.auto]
+  final FluidFallbackMode fallbackMode;
 
   /// Duration for palette color transitions.
   ///
@@ -123,7 +141,19 @@ class _FluidBackgroundState extends State<FluidBackground>
     duration: widget.transitionDuration,
   );
 
-  static const FluidPalette _fallbackPalette = FluidPalette.fallback();
+  FluidPalette _fallbackFor(BuildContext context) {
+    switch (widget.fallbackMode) {
+      case FluidFallbackMode.dark:
+        return const FluidPalette.fallback();
+      case FluidFallbackMode.light:
+        return const FluidPalette.fallbackLight();
+      case FluidFallbackMode.auto:
+        final brightness = Theme.of(context).brightness;
+        return brightness == Brightness.light
+            ? const FluidPalette.fallbackLight()
+            : const FluidPalette.fallback();
+    }
+  }
 
   @override
   void initState() {
@@ -230,16 +260,20 @@ class _FluidBackgroundState extends State<FluidBackground>
 
   @override
   Widget build(BuildContext context) {
-    final FluidPalette target = _palette ?? _fallbackPalette;
+    final fallbackPalette = _fallbackFor(context);
+    final FluidPalette target = _palette ?? fallbackPalette;
     final double tMotion = widget.animate ? _motionController.value : _frozenMotionT;
+    final overlayColor = fallbackPalette.baseDark.computeLuminance() > 0.55
+        ? Colors.white.withValues(alpha: widget.overlayDarken * 0.45)
+        : Colors.black.withValues(alpha: widget.overlayDarken);
 
     return Scaffold(
-      backgroundColor: _fallbackPalette.baseDark,
+      backgroundColor: fallbackPalette.baseDark,
       body: AnimatedBuilder(
         animation: Listenable.merge([_motionController, _revealController]),
         builder: (context, _) {
           final double k = _revealController.value;
-          final FluidPalette current = FluidPalette.lerp(_fallbackPalette, target, k);
+          final FluidPalette current = FluidPalette.lerp(fallbackPalette, target, k);
 
           return Stack(
             fit: StackFit.expand,
@@ -271,8 +305,8 @@ class _FluidBackgroundState extends State<FluidBackground>
                 br: current.accent4,
               ),
 
-              // Dark overlay for legibility
-              Container(color: Colors.black.withOpacity(widget.overlayDarken)),
+              // Adaptive overlay for legibility in dark/light fallback modes
+              Container(color: overlayColor),
 
               // User content
               widget.child,
