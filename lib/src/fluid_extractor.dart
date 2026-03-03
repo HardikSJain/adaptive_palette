@@ -428,7 +428,8 @@ Color _toColor(_Vec3 v) {
 }
 
 /// Boost saturation and lightness for more vibrant output.
-Color _amplify(Color c, {required double satBoost, required double lightBoost}) {
+Color _amplify(Color c,
+    {required double satBoost, required double lightBoost}) {
   final HSLColor hsl = HSLColor.fromColor(c);
   return hsl
       .withSaturation((hsl.saturation * satBoost).clamp(0.0, 0.95))
@@ -440,9 +441,7 @@ Color _amplify(Color c, {required double satBoost, required double lightBoost}) 
 Color _ensureBaseDark(Color c) {
   final HSLColor hsl = HSLColor.fromColor(c);
   if (hsl.lightness <= 0.22) return c;
-  return hsl
-      .withLightness((hsl.lightness * 0.55).clamp(0.08, 0.22))
-      .toColor();
+  return hsl.withLightness((hsl.lightness * 0.55).clamp(0.08, 0.22)).toColor();
 }
 
 /// Replace near-white colors with a matte tinted gray.

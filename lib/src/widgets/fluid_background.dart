@@ -204,10 +204,10 @@ class _FluidBackgroundState extends State<FluidBackground>
 
     _motionController
         .animateTo(
-          1.0,
-          duration: Duration(milliseconds: remainingMs),
-          curve: Curves.linear,
-        )
+      1.0,
+      duration: Duration(milliseconds: remainingMs),
+      curve: Curves.linear,
+    )
         .then((_) {
       if (!mounted || !widget.animate || session != _motionSession) return;
       _motionController.repeat();
@@ -241,7 +241,8 @@ class _FluidBackgroundState extends State<FluidBackground>
   Future<void> _load(ImageProvider provider, {required int loadToken}) async {
     try {
       final ui.Image img = await loadImageFromProvider(provider);
-      final FluidPalette pal = await FluidPaletteExtractor.buildPaletteFromImage(img);
+      final FluidPalette pal =
+          await FluidPaletteExtractor.buildPaletteFromImage(img);
 
       if (!mounted || loadToken != _loadSession) return;
       setState(() {
@@ -262,7 +263,8 @@ class _FluidBackgroundState extends State<FluidBackground>
   Widget build(BuildContext context) {
     final fallbackPalette = _fallbackFor(context);
     final FluidPalette target = _palette ?? fallbackPalette;
-    final double tMotion = widget.animate ? _motionController.value : _frozenMotionT;
+    final double tMotion =
+        widget.animate ? _motionController.value : _frozenMotionT;
     final overlayColor = fallbackPalette.baseDark.computeLuminance() > 0.55
         ? Colors.white.withValues(alpha: widget.overlayDarken * 0.45)
         : Colors.black.withValues(alpha: widget.overlayDarken);
@@ -273,7 +275,8 @@ class _FluidBackgroundState extends State<FluidBackground>
         animation: Listenable.merge([_motionController, _revealController]),
         builder: (context, _) {
           final double k = _revealController.value;
-          final FluidPalette current = FluidPalette.lerp(fallbackPalette, target, k);
+          final FluidPalette current =
+              FluidPalette.lerp(fallbackPalette, target, k);
 
           return Stack(
             fit: StackFit.expand,

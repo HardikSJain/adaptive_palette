@@ -138,7 +138,8 @@ export 'src/widgets/adaptive_image_overlay.dart';
 /// final image = await loadImageFromProvider(NetworkImage(url));
 /// final palette = await FluidPaletteExtractor.extract(image);
 /// ```
-@Deprecated('Use FluidPaletteExtractor.extract() instead. Will be removed in v4.0.0')
+@Deprecated(
+    'Use FluidPaletteExtractor.extract() instead. Will be removed in v4.0.0')
 class AdaptivePalette {
   AdaptivePalette._(); // Private constructor - all methods are static
 
