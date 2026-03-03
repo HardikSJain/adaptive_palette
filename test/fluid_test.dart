@@ -13,7 +13,7 @@ void main() {
 // ---------------------------------------------------------------------------
 
 /// Builds a solid-colour 4×4 RGBA image for use in extraction tests.
-Future<ui.Image> _solidImage(Color color) async {
+Future<ui.Image> solidImage(Color color) async {
   const int size = 4;
   final Uint8List pixels = Uint8List(size * size * 4);
   for (int i = 0; i < size * size; i++) {
@@ -173,7 +173,7 @@ group('FluidPaletteExtractor', () {
   setUp(() => FluidPaletteCache.instance.clear());
 
   test('buildPaletteFromImage returns a valid FluidPalette', () async {
-    final img = await _solidImage(const Color(0xFF1E88E5)); // blue
+    final img = await solidImage(const Color(0xFF1E88E5)); // blue
     final palette = await FluidPaletteExtractor.buildPaletteFromImage(img);
     expect(palette.baseDark, isNotNull);
     expect(palette.accent1, isNotNull);
@@ -184,7 +184,7 @@ group('FluidPaletteExtractor', () {
 
   test('buildPaletteFromImage baseDark has lightness ≤ 0.22', () async {
     // Even on a bright image the base must remain dark for white text.
-    final img = await _solidImage(const Color(0xFFFFEB3B)); // yellow
+    final img = await solidImage(const Color(0xFFFFEB3B)); // yellow
     final palette = await FluidPaletteExtractor.buildPaletteFromImage(img);
     final hsl = HSLColor.fromColor(palette.baseDark);
     expect(hsl.lightness, lessThanOrEqualTo(0.22));
@@ -192,13 +192,13 @@ group('FluidPaletteExtractor', () {
 
   test('cache is populated after buildPaletteFromImage', () async {
     expect(FluidPaletteCache.instance.size, 0);
-    final img = await _solidImage(const Color(0xFF4CAF50)); // green
+    final img = await solidImage(const Color(0xFF4CAF50)); // green
     await FluidPaletteExtractor.buildPaletteFromImage(img);
     expect(FluidPaletteCache.instance.size, 1);
   });
 
   test('second call hits cache — size stays at 1', () async {
-    final img = await _solidImage(const Color(0xFFE91E63)); // pink
+    final img = await solidImage(const Color(0xFFE91E63)); // pink
     await FluidPaletteExtractor.buildPaletteFromImage(img);
     await FluidPaletteExtractor.buildPaletteFromImage(img);
     expect(FluidPaletteCache.instance.size, 1);

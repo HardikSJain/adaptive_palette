@@ -26,7 +26,7 @@ Create stunning, music app-style backgrounds that adapt to your images with smoo
 
 ```yaml
 dependencies:
-  adaptive_palette: ^3.0.0
+  adaptive_palette: ^3.1.0
 ```
 
 ## Quick Start
@@ -58,26 +58,37 @@ class MusicPlayer extends StatelessWidget {
 }
 ```
 
-### Option 2: Manual Color Extraction
+### Option 2: Extract Dominant Colors
 
-For custom implementations where you need direct access to colors:
+Extract the top N dominant colors directly from any `ImageProvider` — no
+intermediate `ui.Image` handling required:
 
 ```dart
-import 'dart:ui' as ui;
 import 'package:adaptive_palette/adaptive_palette.dart';
 
-// Load and extract
-final ui.Image image = await loadImageFromProvider(
+final colors = await FluidPaletteExtractor.extractColors(
   NetworkImage('https://example.com/album.jpg'),
+  count: 5, // 1–10, default 5
 );
-final palette = await FluidPaletteExtractor.extract(image);
 
-// Use colors
-Container(color: palette.baseDark);   // Dark base
-Container(color: palette.accent1);    // Top-left glow
-Container(color: palette.accent2);    // Top-right glow
-Container(color: palette.accent3);    // Bottom-left glow
-Container(color: palette.accent4);    // Bottom-right glow
+// colors[0] is most dominant, use however you like
+Container(color: colors[0]);
+GradientBackground(colors: colors);
+```
+
+Results are automatically cached by image content hash — repeated calls with
+the same image return instantly.
+
+#### Pre-warming the cache
+
+For music players or galleries, pre-warm upcoming images to eliminate first-
+display latency:
+
+```dart
+await FluidPaletteExtractor.warmup([
+  NetworkImage(nextTrack.albumArtUrl),
+  NetworkImage(upNextTrack.albumArtUrl),
+]);
 ```
 
 ## FluidBackground Widget
@@ -104,8 +115,11 @@ FluidBackground(
   // Dark overlay for text legibility (0.05-0.20 recommended)
   overlayDarken: 0.10,
 
-  // Enable slow orbital motion
+  // Enable slow orbital motion (off by default — battery friendly)
   animate: true,
+
+  // Fallback palette when no image is set (dark / light / auto)
+  fallbackMode: FluidFallbackMode.auto,
 
   // Transition duration for palette changes
   transitionDuration: Duration(milliseconds: 1400),
@@ -121,8 +135,9 @@ FluidBackground(
 | `imageProvider` | `ImageProvider?` | `null` | Optional image to extract colors from |
 | `child` | `Widget` | required | Content to display on top |
 | `blurSigma` | `double` | `80` | Blur intensity (higher = softer) |
-| `overlayDarken` | `double` | `0.10` | Dark overlay opacity for legibility |
-| `animate` | `bool` | `true` | Enable orbital motion animation |
+| `overlayDarken` | `double` | `0.10` | Overlay opacity for text legibility |
+| `animate` | `bool` | `false` | Enable orbital motion animation (battery-friendly default) |
+| `fallbackMode` | `FluidFallbackMode` | `auto` | Fallback palette when no image: `dark`, `light`, or `auto` (matches theme brightness) |
 | `transitionDuration` | `Duration` | `1400ms` | Palette transition duration |
 
 ## FluidPalette Model
