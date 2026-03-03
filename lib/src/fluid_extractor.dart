@@ -155,13 +155,17 @@ class FluidPaletteExtractor {
       buildPaletteFromImage(image);
 
   // ---------------------------------------------------------------------------
-  // Internal — used by FluidBackground
+  // Advanced API
   // ---------------------------------------------------------------------------
 
-  /// Builds a [FluidPalette] from a decoded [ui.Image].
+  /// Builds a [FluidPalette] from a pre-decoded [ui.Image].
   ///
-  /// Not part of the public API. Used internally by [FluidBackground] to avoid
-  /// triggering deprecation warnings inside the package. Results are cached.
+  /// Use this when you already hold a [ui.Image] (e.g. from a custom decode
+  /// pipeline). For the common case, prefer [extractColors] which accepts an
+  /// [ImageProvider] directly.
+  ///
+  /// Results are cached by image content hash — repeated calls with the same
+  /// image bytes return instantly without re-running k-means.
   static Future<FluidPalette> buildPaletteFromImage(ui.Image image) async {
     final FluidCacheEntry entry = await _extractOrCache(image);
     return entry.palette;
