@@ -1,6 +1,6 @@
 name: adaptive_palette
 description: Dynamic theming and immersive fluid backgrounds from images. Extract vibrant colors with intelligent algorithms. Create animated backgrounds with layered shaders. Material Design 3 with WCAG accessibility.
-version: 3.0.0
+version: 3.1.0
 homepage: https://github.com/HardikSJain/adaptive_palette
 repository: https://github.com/HardikSJain/adaptive_palette
 issue_tracker: https://github.com/HardikSJain/adaptive_palette/issues
