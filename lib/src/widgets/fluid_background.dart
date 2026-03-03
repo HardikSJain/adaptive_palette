@@ -241,7 +241,7 @@ class _FluidBackgroundState extends State<FluidBackground>
   Future<void> _load(ImageProvider provider, {required int loadToken}) async {
     try {
       final ui.Image img = await loadImageFromProvider(provider);
-      final FluidPalette pal = await FluidPaletteExtractor.extract(img);
+      final FluidPalette pal = await FluidPaletteExtractor.buildPaletteFromImage(img);
 
       if (!mounted || loadToken != _loadSession) return;
       setState(() {
