@@ -8,71 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.1.0] - 2026-03-03
 
 ### Added
-
-- **`FluidFallbackMode` enum** — choose `dark`, `light`, or `auto` for the fallback
-  palette shown before an image loads or when no image is set.
-  - `auto` (default) matches `Theme.of(context).brightness` at render time.
-  - `dark` always uses the deep matte dark fallback.
-  - `light` always uses the new soft pastel light fallback.
-- **`FluidPalette.fallbackLight()`** — matte pastel light-mode fallback palette.
-  Complements the existing `FluidPalette.fallback()` (dark).
-- **`FluidPaletteExtractor.extractColors(ImageProvider, {int count})`** — new
-  primary extraction API. Accepts an `ImageProvider` directly (no manual
-  `loadImageFromProvider` step) and returns a ranked `List<Color>` (most
-  dominant first, matte-treated, max 10). Caller decides how to use the colors.
-- **`FluidPaletteExtractor.warmup(List<ImageProvider>)`** — parallel cache
-  pre-warm. Pass upcoming images (e.g. next tracks in a playlist) so first
-  display is instant. Failed providers are silently skipped.
-- **`FluidPaletteCache`** — LRU cache singleton for fluid extraction results.
-  - Default capacity: 30 entries.
-  - Keyed by SHA-1 of raw RGBA bytes (content-based, not URL-based).
-  - Single extraction run populates both `extractColors` and internal
-    `buildPaletteFromImage` paths — no double-processing.
-  - Exposes `size`, `capacity`, and `clear()` for memory management.
-- **`FluidCacheEntry`** — exported cache entry type; holds `List<Color>` and
-  `FluidPalette` together.
-- **Stale async load guard** — `FluidBackground` now uses a per-load session
-  token. Rapid `imageProvider` changes no longer allow old palette results to
-  overwrite the current image's palette.
-- **Adaptive legibility overlay** — `FluidBackground` overlay now adapts to
-  fallback brightness. Light fallback → subtle white overlay; dark fallback →
-  black overlay. Keeps text readable in both modes.
-- **29 new tests** in `test/fluid_test.dart` covering `FluidPalette`,
-  `FluidPaletteCache`, `FluidPaletteExtractor`, `FluidFallbackMode`, and
-  `FluidBackground` widget interactions.
-
-### Deprecated
-
-- **`FluidPaletteExtractor.extract(ui.Image)`** — will be removed in v4.0.0.
-  Use `FluidPaletteExtractor.extractColors(ImageProvider)` instead. Migration:
-  ```dart
-  // Before:
-  final image = await loadImageFromProvider(provider);
-  final palette = await FluidPaletteExtractor.extract(image);
-
-  // After:
-  final colors = await FluidPaletteExtractor.extractColors(provider);
-  ```
+- `FluidFallbackMode` enum (`dark` / `light` / `auto`) on `FluidBackground` — defaults to `auto` (matches theme brightness)
+- `FluidPalette.fallbackLight()` — pastel light-mode fallback palette
+- `FluidPaletteExtractor.extractColors(ImageProvider, {int count})` — new primary extraction API; returns ranked `List<Color>`
+- `FluidPaletteExtractor.warmup(List<ImageProvider>)` — parallel cache pre-warm
+- `FluidPaletteCache` — LRU singleton (30 entries, SHA-1 keyed); auto-populated on every extraction
 
 ### Changed
-
-- **`FluidBackground.animate` default** changed from `true` to `false`.
-  Battery-friendly by default; opt-in with `animate: true`.
-- **`FluidBackground` animation toggle** is now smooth: toggling `animate` at
-  runtime freezes the current phase instead of jumping to a fixed position, then
-  resumes linearly from that phase when re-enabled.
+- `FluidBackground.animate` default → `false` (battery-friendly; opt-in with `animate: true`)
+- Animation toggle is now smooth — resumes from frozen phase instead of jumping
 
 ### Fixed
+- Stale async race in `FluidBackground`: rapid image provider changes no longer corrupt the displayed palette
 
-- `FluidBackground` stale-async race: image provider changes that arrive while
-  a previous decode is in-flight no longer corrupt the displayed palette.
-
-### Internal
-
-- Shared `_pipeline` refactor: pixel decode, hash, and k-means are now a single
-  code path used by both `extractColors` and `buildPaletteFromImage`.
-- `buildPaletteFromImage` is now a named internal method (not deprecated),
-  avoiding deprecation lint inside the package.
+### Deprecated
+- `FluidPaletteExtractor.extract(ui.Image)` — use `extractColors(ImageProvider)` instead; will be removed in v4.0.0
 
 ---
 
