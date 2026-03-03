@@ -5,9 +5,10 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 import 'config.dart';
+import 'fluid_palette.dart';
 import 'models.dart';
 
 /// Singleton cache for color palettes keyed by image content hash.
@@ -100,4 +101,74 @@ class _LruMap<K, V> {
 /// Compute SHA-1 hash of image bytes for content-based caching.
 String computeImageHash(Uint8List data) {
   return crypto.sha1.convert(data).toString();
+}
+
+// =============================================================================
+// Fluid palette cache
+// =============================================================================
+
+/// Cached result of a fluid palette extraction run.
+///
+/// Stores both representations so a single k-means run serves both
+/// [FluidPaletteExtractor.extractColors] and
+/// [FluidPaletteExtractor.buildPaletteFromImage] without re-processing.
+///
+/// [colors] contains up to 10 dominant colors (max allowed by [extractColors]).
+/// Callers requesting fewer than 10 take the leading slice.
+class FluidCacheEntry {
+  const FluidCacheEntry({required this.colors, required this.palette});
+
+  /// Dominant colors ranked by vibrancy, matte-treated. Max 10 entries.
+  final List<Color> colors;
+
+  /// Structured palette for immersive background rendering.
+  final FluidPalette palette;
+}
+
+/// LRU cache for fluid palette extraction results, keyed by image content hash.
+///
+/// Results are cached after the first extraction so subsequent calls with the
+/// same image content return instantly without re-running k-means.
+///
+/// The cache is a singleton. Access it via [FluidPaletteCache.instance]:
+///
+/// ```dart
+/// // Pre-warm for upcoming images (e.g. next tracks in a playlist)
+/// await FluidPaletteExtractor.warmup([
+///   NetworkImage(track1.albumArtUrl),
+///   NetworkImage(track2.albumArtUrl),
+/// ]);
+///
+/// // Inspect cache stats
+/// print('${FluidPaletteCache.instance.size} / ${FluidPaletteCache.instance.capacity}');
+///
+/// // Clear when memory pressure detected
+/// FluidPaletteCache.instance.clear();
+/// ```
+class FluidPaletteCache {
+  FluidPaletteCache._() : _map = _LruMap(capacity: defaultCapacity);
+
+  /// Singleton instance.
+  static final FluidPaletteCache instance = FluidPaletteCache._();
+
+  /// Default LRU capacity — covers a typical "now playing + recent history"
+  /// scenario for music players and image galleries.
+  static const int defaultCapacity = 30;
+
+  _LruMap<String, FluidCacheEntry> _map;
+
+  /// Retrieve a cached entry by content hash key. Returns null on miss.
+  FluidCacheEntry? get(String key) => _map.get(key);
+
+  /// Store an extraction result under its content hash key.
+  void put(String key, FluidCacheEntry entry) => _map.put(key, entry);
+
+  /// Remove all cached entries.
+  void clear() => _map = _LruMap(capacity: defaultCapacity);
+
+  /// Number of entries currently in the cache.
+  int get size => _map.size;
+
+  /// Maximum number of entries before LRU eviction occurs.
+  int get capacity => _map.capacity;
 }

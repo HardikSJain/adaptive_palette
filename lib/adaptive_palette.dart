@@ -89,8 +89,9 @@ import 'src/theme.dart';
 /// Load ui.Image from ImageProvider for color extraction
 export 'src/extraction.dart' show loadImageFromProvider;
 
-/// FluidPaletteExtractor - Extract colors from images
+/// FluidPaletteExtractor - Extract colors from images; FluidPaletteCache - LRU cache
 export 'src/fluid_extractor.dart';
+export 'src/cache.dart' show FluidPaletteCache, FluidCacheEntry;
 
 /// FluidPalette - Color palette model (baseDark + 4 accents)
 export 'src/fluid_palette.dart';

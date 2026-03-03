@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'cache.dart';
 import 'extraction.dart';
 import 'fluid_palette.dart';
 
@@ -22,6 +23,21 @@ import 'fluid_palette.dart';
 ///   NetworkImage('https://example.com/album.jpg'),
 ///   count: 5,
 /// );
+/// ```
+///
+/// Results are automatically cached in [FluidPaletteCache] by image content
+/// hash (SHA-1). Subsequent calls with the same image return instantly.
+///
+/// ## Pre-warming the cache
+///
+/// For music players or galleries where you know upcoming images, pre-warm
+/// to eliminate latency on first display:
+///
+/// ```dart
+/// await FluidPaletteExtractor.warmup([
+///   NetworkImage(nextTrack.albumArtUrl),
+///   NetworkImage(upNextTrack.albumArtUrl),
+/// ]);
 /// ```
 ///
 /// ## Internal palette extraction
@@ -40,6 +56,7 @@ import 'fluid_palette.dart';
 /// 4. **Perceptual scoring** — clusters ranked by saturation and mid-tone
 ///    preference.
 /// 5. **Matte treatment** — over-bright whites clamped to vibrant matte tones.
+/// 6. **LRU cache** — results cached by image content hash; default 30 entries.
 class FluidPaletteExtractor {
   FluidPaletteExtractor._(); // Private constructor — static API only.
 
@@ -51,6 +68,9 @@ class FluidPaletteExtractor {
   ///
   /// Returns colors ranked by vibrancy — most dominant first. Colors are
   /// matte-treated to prevent harsh whites and washed-out highlights.
+  ///
+  /// Results are cached in [FluidPaletteCache] by image content hash.
+  /// Subsequent calls with the same image content return instantly.
   ///
   /// [count] must be between 1 and 10 (inclusive). When fewer distinct colors
   /// are found than requested, the returned list may be shorter than [count].
@@ -76,20 +96,34 @@ class FluidPaletteExtractor {
     final int clampedCount = count.clamp(1, 10);
 
     final ui.Image image = await loadImageFromProvider(provider);
-    final List<_Vec3> centers = await _pipeline(image);
+    final FluidCacheEntry entry = await _extractOrCache(image);
 
-    if (centers.isEmpty) return const [];
+    return entry.colors.take(clampedCount).toList();
+  }
 
-    return centers
-        .take(clampedCount)
-        .map(
-          (v) => _matteizeIfTooBright(
-            _matteizeWhite(
-              _amplify(_toColor(v), satBoost: 1.18, lightBoost: 1.04),
-            ),
-          ),
-        )
-        .toList();
+  /// Pre-warm the [FluidPaletteCache] for a list of upcoming images.
+  ///
+  /// Runs extraction in parallel for all providers. Failed extractions are
+  /// silently skipped — they will be re-attempted on first use.
+  ///
+  /// Example — pre-warm next tracks in a playlist:
+  /// ```dart
+  /// await FluidPaletteExtractor.warmup([
+  ///   NetworkImage(nextTrack.albumArtUrl),
+  ///   NetworkImage(upNextTrack.albumArtUrl),
+  /// ]);
+  /// ```
+  static Future<void> warmup(List<ImageProvider> providers) async {
+    await Future.wait(
+      providers.map((provider) async {
+        try {
+          final ui.Image image = await loadImageFromProvider(provider);
+          await _extractOrCache(image);
+        } catch (_) {
+          // Silently skip — warmup failures are non-fatal.
+        }
+      }),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -118,7 +152,7 @@ class FluidPaletteExtractor {
     'extract() will be removed in v4.0.0.',
   )
   static Future<FluidPalette> extract(ui.Image image) =>
-      _buildFluidPalette(image);
+      buildPaletteFromImage(image);
 
   // ---------------------------------------------------------------------------
   // Internal — used by FluidBackground
@@ -127,16 +161,59 @@ class FluidPaletteExtractor {
   /// Builds a [FluidPalette] from a decoded [ui.Image].
   ///
   /// Not part of the public API. Used internally by [FluidBackground] to avoid
-  /// triggering deprecation warnings inside the package.
-  static Future<FluidPalette> buildPaletteFromImage(ui.Image image) =>
-      _buildFluidPalette(image);
+  /// triggering deprecation warnings inside the package. Results are cached.
+  static Future<FluidPalette> buildPaletteFromImage(ui.Image image) async {
+    final FluidCacheEntry entry = await _extractOrCache(image);
+    return entry.palette;
+  }
 
   // ---------------------------------------------------------------------------
   // Private implementation
   // ---------------------------------------------------------------------------
 
-  static Future<FluidPalette> _buildFluidPalette(ui.Image image) async {
-    final List<_Vec3> centers = await _pipeline(image);
+  /// Core extraction + cache logic.
+  ///
+  /// Decodes [image] to raw bytes once, computes a content hash, returns the
+  /// cached [FluidCacheEntry] on hit, or runs the full pipeline on miss and
+  /// stores both [FluidPalette] and [List<Color>] representations together.
+  static Future<FluidCacheEntry> _extractOrCache(ui.Image image) async {
+    final ByteData? bd =
+        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (bd == null) {
+      return FluidCacheEntry(
+        colors: const [],
+        palette: const FluidPalette.fallback(),
+      );
+    }
+
+    final Uint8List px = bd.buffer.asUint8List();
+    final String key = computeImageHash(px);
+
+    final FluidCacheEntry? cached = FluidPaletteCache.instance.get(key);
+    if (cached != null) return cached;
+
+    final List<_Vec3> centers = _runPipeline(px, image.width, image.height);
+
+    final List<Color> colors = centers
+        .take(10)
+        .map(
+          (v) => _matteizeIfTooBright(
+            _matteizeWhite(
+              _amplify(_toColor(v), satBoost: 1.18, lightBoost: 1.04),
+            ),
+          ),
+        )
+        .toList();
+
+    final FluidPalette palette = _buildPalette(centers);
+    final FluidCacheEntry entry =
+        FluidCacheEntry(colors: colors, palette: palette);
+
+    FluidPaletteCache.instance.put(key, entry);
+    return entry;
+  }
+
+  static FluidPalette _buildPalette(List<_Vec3> centers) {
     if (centers.isEmpty) return const FluidPalette.fallback();
 
     Color pick(int idx, {required double satB, required double lightB}) {
@@ -160,16 +237,9 @@ class FluidPaletteExtractor {
 
   /// Shared pixel sampling and weighted k-means clustering pipeline.
   ///
+  /// Accepts pre-decoded [px] bytes to avoid double-decoding.
   /// Returns cluster centers sorted by perceptual vibrancy score.
-  static Future<List<_Vec3>> _pipeline(ui.Image image) async {
-    final ByteData? bd =
-        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    if (bd == null) return const [];
-
-    final Uint8List px = bd.buffer.asUint8List();
-    final int w = image.width;
-    final int h = image.height;
-
+  static List<_Vec3> _runPipeline(Uint8List px, int w, int h) {
     final List<_Vec3> samples = [];
     const int stride = 10;
 
