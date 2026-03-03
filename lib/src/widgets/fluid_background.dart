@@ -11,6 +11,18 @@ import '../extraction.dart';
 import '../fluid_extractor.dart';
 import '../fluid_palette.dart';
 
+/// Fallback palette mode when image is unavailable or extraction fails.
+enum FluidFallbackMode {
+  /// Always use the dark fallback palette.
+  dark,
+
+  /// Always use the light fallback palette.
+  light,
+
+  /// Match fallback palette to [Theme.of(context).brightness].
+  auto,
+}
+
 /// Immersive animated background widget inspired by modern music apps.
 ///
 /// Features:
@@ -61,7 +73,8 @@ class FluidBackground extends StatefulWidget {
     required this.child,
     this.blurSigma = 80,
     this.overlayDarken = 0.10,
-    this.animate = true,
+    this.animate = false,
+    this.fallbackMode = FluidFallbackMode.auto,
     this.transitionDuration = const Duration(milliseconds: 1400),
   });
 
@@ -89,8 +102,13 @@ class FluidBackground extends StatefulWidget {
   /// Enable slow orbital motion animation.
   ///
   /// When true, shader layers slowly rotate and translate (12s cycle).
-  /// Default: true
+  /// Default: false (battery-friendly, deterministic fallback)
   final bool animate;
+
+  /// Fallback palette mode when image is missing or extraction fails.
+  ///
+  /// Default: [FluidFallbackMode.auto]
+  final FluidFallbackMode fallbackMode;
 
   /// Duration for palette color transitions.
   ///
@@ -107,22 +125,42 @@ class _FluidBackgroundState extends State<FluidBackground>
   ui.Image? _image;
   FluidPalette? _palette;
 
+  static const Duration _motionDuration = Duration(seconds: 12);
+
   late final AnimationController _motionController = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 12),
+    duration: _motionDuration,
   );
+
+  double _frozenMotionT = 0.35;
+  int _motionSession = 0;
+  int _loadSession = 0;
 
   late final AnimationController _revealController = AnimationController(
     vsync: this,
     duration: widget.transitionDuration,
   );
 
-  static const FluidPalette _fallbackPalette = FluidPalette.fallback();
+  FluidPalette _fallbackFor(BuildContext context) {
+    switch (widget.fallbackMode) {
+      case FluidFallbackMode.dark:
+        return const FluidPalette.fallback();
+      case FluidFallbackMode.light:
+        return const FluidPalette.fallbackLight();
+      case FluidFallbackMode.auto:
+        final brightness = Theme.of(context).brightness;
+        return brightness == Brightness.light
+            ? const FluidPalette.fallbackLight()
+            : const FluidPalette.fallback();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    if (widget.animate) _motionController.repeat();
+    if (widget.animate) {
+      _resumeMotionFromFrozen();
+    }
     _kickLoad();
   }
 
@@ -132,15 +170,50 @@ class _FluidBackgroundState extends State<FluidBackground>
 
     if (oldWidget.animate != widget.animate) {
       if (widget.animate) {
-        _motionController.repeat();
+        _resumeMotionFromFrozen();
       } else {
-        _motionController.stop();
+        _freezeMotion();
       }
+      if (mounted) setState(() {});
     }
 
     if (oldWidget.imageProvider != widget.imageProvider) {
       _kickLoad();
     }
+  }
+
+  void _freezeMotion() {
+    _motionSession++;
+    _frozenMotionT = _motionController.value;
+    _motionController.stop(canceled: false);
+  }
+
+  void _resumeMotionFromFrozen() {
+    final int session = ++_motionSession;
+
+    _motionController.value = _frozenMotionT;
+    final remaining = (1.0 - _frozenMotionT).clamp(0.0, 1.0).toDouble();
+
+    if (remaining <= 0.0001) {
+      _motionController.repeat();
+      return;
+    }
+
+    final remainingMs =
+        (_motionDuration.inMilliseconds * remaining).round().clamp(1, 600000);
+
+    _motionController
+        .animateTo(
+      1.0,
+      duration: Duration(milliseconds: remainingMs),
+      curve: Curves.linear,
+    )
+        .then((_) {
+      if (!mounted || !widget.animate || session != _motionSession) return;
+      _motionController.repeat();
+    }).catchError((_) {
+      // Safe to ignore ticker cancellation during rapid animate toggles.
+    });
   }
 
   @override
@@ -151,6 +224,8 @@ class _FluidBackgroundState extends State<FluidBackground>
   }
 
   void _kickLoad() {
+    final int loadToken = ++_loadSession;
+
     _revealController.value = 0;
     _image = null;
     _palette = null;
@@ -160,15 +235,16 @@ class _FluidBackgroundState extends State<FluidBackground>
       setState(() {});
       return;
     }
-    _load(provider);
+    _load(provider, loadToken: loadToken);
   }
 
-  Future<void> _load(ImageProvider provider) async {
+  Future<void> _load(ImageProvider provider, {required int loadToken}) async {
     try {
       final ui.Image img = await loadImageFromProvider(provider);
-      final FluidPalette pal = await FluidPaletteExtractor.extract(img);
+      final FluidPalette pal =
+          await FluidPaletteExtractor.buildPaletteFromImage(img);
 
-      if (!mounted) return;
+      if (!mounted || loadToken != _loadSession) return;
       setState(() {
         _image = img;
         _palette = pal;
@@ -176,7 +252,7 @@ class _FluidBackgroundState extends State<FluidBackground>
 
       await _revealController.forward(from: 0);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || loadToken != _loadSession) return;
       _image = null;
       _palette = null;
       setState(() {});
@@ -185,16 +261,22 @@ class _FluidBackgroundState extends State<FluidBackground>
 
   @override
   Widget build(BuildContext context) {
-    final FluidPalette target = _palette ?? _fallbackPalette;
-    final double tMotion = widget.animate ? _motionController.value : 0.35;
+    final fallbackPalette = _fallbackFor(context);
+    final FluidPalette target = _palette ?? fallbackPalette;
+    final double tMotion =
+        widget.animate ? _motionController.value : _frozenMotionT;
+    final overlayColor = fallbackPalette.baseDark.computeLuminance() > 0.55
+        ? Colors.white.withValues(alpha: widget.overlayDarken * 0.45)
+        : Colors.black.withValues(alpha: widget.overlayDarken);
 
     return Scaffold(
-      backgroundColor: _fallbackPalette.baseDark,
+      backgroundColor: fallbackPalette.baseDark,
       body: AnimatedBuilder(
         animation: Listenable.merge([_motionController, _revealController]),
         builder: (context, _) {
           final double k = _revealController.value;
-          final FluidPalette current = FluidPalette.lerp(_fallbackPalette, target, k);
+          final FluidPalette current =
+              FluidPalette.lerp(fallbackPalette, target, k);
 
           return Stack(
             fit: StackFit.expand,
@@ -226,8 +308,8 @@ class _FluidBackgroundState extends State<FluidBackground>
                 br: current.accent4,
               ),
 
-              // Dark overlay for legibility
-              Container(color: Colors.black.withOpacity(widget.overlayDarken)),
+              // Adaptive overlay for legibility in dark/light fallback modes
+              Container(color: overlayColor),
 
               // User content
               widget.child,

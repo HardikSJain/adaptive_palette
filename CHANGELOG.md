@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-03-03
+
+### Added
+- `FluidFallbackMode` enum (`dark` / `light` / `auto`) on `FluidBackground` — defaults to `auto` (matches theme brightness)
+- `FluidPalette.fallbackLight()` — pastel light-mode fallback palette
+- `FluidPaletteExtractor.extractColors(ImageProvider, {int count})` — new primary extraction API; returns ranked `List<Color>`
+- `FluidPaletteExtractor.warmup(List<ImageProvider>)` — parallel cache pre-warm
+- `FluidPaletteCache` — LRU singleton (30 entries, SHA-1 keyed); auto-populated on every extraction
+
+### Changed
+- `FluidBackground.animate` default → `false` (battery-friendly; opt-in with `animate: true`)
+- Animation toggle is now smooth — resumes from frozen phase instead of jumping
+
+### Fixed
+- Stale async race in `FluidBackground`: rapid image provider changes no longer corrupt the displayed palette
+
+### Deprecated
+- `FluidPaletteExtractor.extract(ui.Image)` — use `extractColors(ImageProvider)` instead; will be removed in v4.0.0
+
+---
+
 ## [3.0.0] - 2025-12-24
 
 ### Major Release - Complete Redesign

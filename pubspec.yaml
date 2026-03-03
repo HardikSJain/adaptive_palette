@@ -1,20 +1,20 @@
 name: adaptive_palette
-description: Dynamic theming and immersive fluid backgrounds from images. Extract vibrant colors with intelligent algorithms. Create animated backgrounds with layered shaders. Material Design 3 with WCAG accessibility.
-version: 3.0.0
+description: Immersive fluid animated backgrounds from images. Weighted k-means color extraction, LRU cache, dark/light/auto fallback, and smooth orbital motion.
+version: 3.1.0
 homepage: https://github.com/HardikSJain/adaptive_palette
 repository: https://github.com/HardikSJain/adaptive_palette
 issue_tracker: https://github.com/HardikSJain/adaptive_palette/issues
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.24.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  material_color_utilities: ^0.11.1
+  material_color_utilities: ^0.13.0
   crypto: ^3.0.3
   cached_network_image: ^3.4.1
-  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

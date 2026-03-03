@@ -89,8 +89,9 @@ import 'src/theme.dart';
 /// Load ui.Image from ImageProvider for color extraction
 export 'src/extraction.dart' show loadImageFromProvider;
 
-/// FluidPaletteExtractor - Extract colors from images
+/// FluidPaletteExtractor - Extract colors from images; FluidPaletteCache - LRU cache
 export 'src/fluid_extractor.dart';
+export 'src/cache.dart' show FluidPaletteCache, FluidCacheEntry;
 
 /// FluidPalette - Color palette model (baseDark + 4 accents)
 export 'src/fluid_palette.dart';
@@ -137,7 +138,8 @@ export 'src/widgets/adaptive_image_overlay.dart';
 /// final image = await loadImageFromProvider(NetworkImage(url));
 /// final palette = await FluidPaletteExtractor.extract(image);
 /// ```
-@Deprecated('Use FluidPaletteExtractor.extract() instead. Will be removed in v4.0.0')
+@Deprecated(
+    'Use FluidPaletteExtractor.extract() instead. Will be removed in v4.0.0')
 class AdaptivePalette {
   AdaptivePalette._(); // Private constructor - all methods are static
 

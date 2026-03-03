@@ -39,13 +39,21 @@ class FluidPalette {
     required this.accent4,
   });
 
-  /// Default matte fallback palette (used when no image is provided).
+  /// Default matte fallback palette (dark mode).
   const FluidPalette.fallback()
       : baseDark = const Color(0xFF0F1419),
         accent1 = const Color(0xFF2C1F4A),
         accent2 = const Color(0xFF2E3B5F),
         accent3 = const Color(0xFF3A2858),
         accent4 = const Color(0xFF1F2D4E);
+
+  /// Matte fallback palette optimized for light mode surfaces.
+  const FluidPalette.fallbackLight()
+      : baseDark = const Color(0xFFF4F6FA),
+        accent1 = const Color(0xFFE3D8FF),
+        accent2 = const Color(0xFFD9E7FF),
+        accent3 = const Color(0xFFF3DCF1),
+        accent4 = const Color(0xFFDCE7F8);
 
   /// Linearly interpolate between two palettes.
   ///
