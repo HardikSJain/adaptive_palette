@@ -1,10 +1,132 @@
 // Tests for fluid palette extraction, cache, and FluidBackground behaviour.
-import 'dart:typed_data';
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:adaptive_palette/adaptive_palette.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+// Helpers used by the smooth-transition widget tests.
+
+/// Image provider that never resolves, simulating a hanging image load.
+class _NeverLoadingImage extends ImageProvider<_NeverLoadingImage> {
+  const _NeverLoadingImage();
+
+  @override
+  Future<_NeverLoadingImage> obtainKey(ImageConfiguration configuration) =>
+      SynchronousFuture<_NeverLoadingImage>(this);
+
+  @override
+  ImageStreamCompleter loadImage(
+    _NeverLoadingImage key,
+    ImageDecoderCallback decode,
+  ) =>
+      OneFrameImageStreamCompleter(Completer<ImageInfo>().future);
+}
+
+/// Serves a pre-decoded image without going through a codec, so widget tests
+/// resolve it instantly under fake async.
+class _StaticImageProvider extends ImageProvider<_StaticImageProvider> {
+  const _StaticImageProvider(this.image);
+
+  final ui.Image image;
+
+  @override
+  Future<_StaticImageProvider> obtainKey(ImageConfiguration configuration) =>
+      SynchronousFuture<_StaticImageProvider>(this);
+
+  @override
+  ImageStreamCompleter loadImage(
+    _StaticImageProvider key,
+    ImageDecoderCallback decode,
+  ) =>
+      OneFrameImageStreamCompleter(
+        Future<ImageInfo>.value(ImageInfo(image: image)),
+      );
+}
+
+ui.Image? _redImage;
+ui.Image? _blueImage;
+
+/// Counts the fluid shader layers currently painted by [FluidBackground].
+int _fluidPainterCount(WidgetTester tester) => tester
+    .widgetList<CustomPaint>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is CustomPaint &&
+            widget.painter?.runtimeType.toString() == '_FluidShaderPainter',
+      ),
+    )
+    .length;
+
+/// Lets the real event loop run briefly so engine futures initiated under
+/// fake async (e.g. `ui.Image.toByteData` inside palette extraction) can
+/// deliver their responses.
+Future<void> _spinEventLoop(WidgetTester tester) => tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+
+/// Vertical colour stripes, so orbiting/rotating the image actually changes
+/// the rendered pixels (a solid colour looks identical however it moves).
+Future<ui.Image> _stripedImage(Color a, Color b) async {
+  const int size = 64;
+  final Uint8List pixels = Uint8List(size * size * 4);
+  for (int y = 0; y < size; y++) {
+    for (int x = 0; x < size; x++) {
+      final Color c = ((x ~/ 8) + (y ~/ 8)).isEven ? a : b;
+      final int i = (y * size + x) * 4;
+      pixels[i + 0] = c.red;
+      pixels[i + 1] = c.green;
+      pixels[i + 2] = c.blue;
+      pixels[i + 3] = 255;
+    }
+  }
+  final ui.ImmutableBuffer buf =
+      await ui.ImmutableBuffer.fromUint8List(pixels);
+  final ui.ImageDescriptor desc = ui.ImageDescriptor.raw(
+    buf,
+    width: size,
+    height: size,
+    pixelFormat: ui.PixelFormat.rgba8888,
+  );
+  final ui.Codec codec = await desc.instantiateCodec();
+  return (await codec.getNextFrame()).image;
+}
+
+/// Rasterizes the [RepaintBoundary] under [key].
+Future<Uint8List> _capture(WidgetTester tester, Key key) async {
+  late final Uint8List bytes;
+  await tester.runAsync(() async {
+    final RenderRepaintBoundary boundary =
+        tester.renderObject<RenderRepaintBoundary>(find.byKey(key));
+    final ui.Image image = await boundary.toImage();
+    final ByteData? data =
+        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    bytes = data!.buffer.asUint8List();
+  });
+  return bytes;
+}
+
+/// Largest per-channel difference between two raw RGBA captures.
+int _maxDelta(Uint8List a, Uint8List b) {
+  var maxDelta = 0;
+  for (var i = 0; i < a.length && i < b.length; i++) {
+    final d = (a[i] - b[i]).abs();
+    if (d > maxDelta) maxDelta = d;
+  }
+  return maxDelta;
+}
+
+/// Pumps (advancing fake time and spinning the real event loop) until
+/// [predicate] holds, so assertions don't depend on engine callback timing.
+Future<void> _pumpUntil(WidgetTester tester, bool Function() predicate) async {
+  for (var i = 0; i < 40 && !predicate(); i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    await _spinEventLoop(tester);
+  }
+}
 
 void main() {
 
@@ -34,6 +156,20 @@ Future<ui.Image> solidImage(Color color) async {
   final ui.FrameInfo frame = await codec.getNextFrame();
   return frame.image;
 }
+
+// Decodes the solid images used by the widget tests below. Plain async, so
+// the engine codec actually completes (it stalls under fake async).
+test('creates solid images for the widget tests', () async {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  _redImage = await _stripedImage(
+    const Color(0xFFFF0000),
+    const Color(0xFF400000),
+  );
+  _blueImage = await _stripedImage(
+    const Color(0xFF0000FF),
+    const Color(0xFF000040),
+  );
+});
 
 // ---------------------------------------------------------------------------
 // FluidPalette model
@@ -383,6 +519,156 @@ group('FluidBackground widget', () {
 
     await tester.tap(find.text('clear'));
     await tester.pump();
+  });
+
+  testWidgets('legacy mode drops to the matte while a new image loads',
+      (tester) async {
+    ImageProvider provider = _StaticImageProvider(_redImage!);
+
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return MaterialApp(
+            home: Scaffold(
+              body: Stack(
+                children: [
+                  FluidBackground(
+                    imageProvider: provider,
+                    child: const SizedBox.expand(),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: ElevatedButton(
+                      onPressed: () =>
+                          setState(() => provider = const _NeverLoadingImage()),
+                      child: const Text('swap'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    await _pumpUntil(tester, () => _fluidPainterCount(tester) == 1);
+    expect(_fluidPainterCount(tester), 1);
+
+    // swapping to a provider that never resolves wipes the display
+    await tester.tap(find.text('swap'));
+    await tester.pump();
+    expect(_fluidPainterCount(tester), 0);
+  });
+
+  testWidgets('smooth mode crossfades from the previous image', (tester) async {
+    final followUps = <ImageProvider>[
+      const _NeverLoadingImage(),
+      _StaticImageProvider(_blueImage!),
+    ];
+    var swaps = 0;
+    ImageProvider provider = _StaticImageProvider(_redImage!);
+
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return MaterialApp(
+            home: Scaffold(
+              body: Stack(
+                children: [
+                  FluidBackground(
+                    imageProvider: provider,
+                    smoothTransitions: true,
+                    child: const SizedBox.expand(),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: ElevatedButton(
+                      onPressed: () => setState(
+                        () => provider = followUps[swaps++ % followUps.length],
+                      ),
+                      child: const Text('swap'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    await _pumpUntil(tester, () => _fluidPainterCount(tester) == 1);
+    expect(_fluidPainterCount(tester), 1);
+
+    // the previous image stays on screen while the new one is loading
+    await tester.tap(find.text('swap'));
+    await tester.pump();
+    expect(_fluidPainterCount(tester), 1);
+
+    // the new image crossfades in on top of the old one
+    await tester.tap(find.text('swap'));
+    await tester.pump();
+    await _pumpUntil(tester, () => _fluidPainterCount(tester) == 2);
+    expect(_fluidPainterCount(tester), 2);
+
+    // and only the new one remains once the crossfade completes
+    await tester.pumpAndSettle();
+    await _pumpUntil(tester, () => _fluidPainterCount(tester) == 1);
+    expect(_fluidPainterCount(tester), 1);
+  });
+
+  testWidgets('animate: true actually animates the background', (tester) async {
+    final bgKey = GlobalKey();
+
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: bgKey,
+        child: MaterialApp(
+          home: Scaffold(
+            body: FluidBackground(
+              imageProvider: _StaticImageProvider(_redImage!),
+              animate: true,
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await _pumpUntil(tester, () => _fluidPainterCount(tester) == 1);
+    await tester.pump(const Duration(milliseconds: 1600));
+
+    final before = await _capture(tester, bgKey);
+    await tester.pump(const Duration(milliseconds: 1000));
+    final after = await _capture(tester, bgKey);
+    expect(_maxDelta(before, after), greaterThan(0));
+  });
+
+  testWidgets('animate: false keeps the background static', (tester) async {
+    final bgKey = GlobalKey();
+
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: bgKey,
+        child: MaterialApp(
+          home: Scaffold(
+            body: FluidBackground(
+              imageProvider: _StaticImageProvider(_redImage!),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await _pumpUntil(tester, () => _fluidPainterCount(tester) == 1);
+    await tester.pump(const Duration(milliseconds: 1600));
+
+    final before = await _capture(tester, bgKey);
+    await tester.pump(const Duration(milliseconds: 1000));
+    final after = await _capture(tester, bgKey);
+    expect(_maxDelta(before, after), 0);
   });
 });
 
