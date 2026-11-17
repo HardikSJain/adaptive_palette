@@ -148,6 +148,14 @@ class _FluidBackgroundState extends State<FluidBackground>
   int _motionSession = 0;
   int _loadSession = 0;
 
+  /// The in-flight reveal, or null when idle. New commits wait for it so the
+  /// displayed blend always completes before the next crossfade starts.
+  Future<void>? _activeReveal;
+
+  /// Bumped whenever a reveal starts; a reveal's completion cleanup runs only
+  /// if it still owns the latest reveal.
+  int _revealSession = 0;
+
   late final AnimationController _revealController = AnimationController(
     vsync: this,
     duration: widget.transitionDuration,
@@ -246,7 +254,9 @@ class _FluidBackgroundState extends State<FluidBackground>
 
     final provider = widget.imageProvider;
     if (provider == null) {
+      // Resetting the value cancels the running reveal's ticker.
       _revealController.value = 0;
+      _activeReveal = null;
       _image = null;
       _previousImage = null;
       _palette = null;
@@ -274,6 +284,23 @@ class _FluidBackgroundState extends State<FluidBackground>
           await FluidPaletteExtractor.buildPaletteFromImage(img);
 
       if (!mounted || loadToken != _loadSession) return;
+
+      // Let the in-flight reveal finish so the displayed blend (e.g. an
+      // interrupted A-to-B crossfade) completes on screen before blending
+      // toward the new image. Superseded commits bail out at the checks
+      // below, so rapid provider changes collapse into a single crossfade
+      // to the latest image instead of piling up reveals.
+      final Future<void>? pending = _activeReveal;
+      if (pending != null) {
+        try {
+          await pending;
+        } catch (_) {
+          // The pending reveal was interrupted (reset/dispose); its state
+          // is already handled where the cancellation happened.
+        }
+        if (!mounted || loadToken != _loadSession) return;
+      }
+
       setState(() {
         if (widget.smoothTransitions && _image != null) {
           // Keep the previous image/palette.
@@ -284,9 +311,20 @@ class _FluidBackgroundState extends State<FluidBackground>
         _palette = pal;
       });
 
-      await _revealController.forward(from: 0);
+      final int revealToken = ++_revealSession;
+      final Future<void> reveal = _revealController.forward(from: 0).orCancel;
+      _activeReveal = reveal;
+      try {
+        await reveal;
+      } catch (_) {
+        // The reveal was canceled (reset/dispose); that path already
+        // cleared the display state.
+        return;
+      } finally {
+        if (identical(_activeReveal, reveal)) _activeReveal = null;
+      }
 
-      if (!mounted || loadToken != _loadSession) return;
+      if (!mounted || revealToken != _revealSession) return;
       // Clear the state once the transition finishes.
       setState(() {
         _previousImage = null;
