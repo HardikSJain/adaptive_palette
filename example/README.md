@@ -1,62 +1,39 @@
-# adaptive_palette Example
+# adaptive_palette example
 
-This example demonstrates the key features of the `adaptive_palette` package:
+A music-player style screen built on `FluidBackground`
+([lib/main.dart](lib/main.dart)). Skip between tracks to watch the background
+follow the album art; the two app bar buttons toggle the orbital motion and
+smooth crossfades.
 
-## Features Showcased
+```dart
+FluidBackground(
+  imageProvider: NetworkImage(albumArtUrl),
+  animate: true,
+  smoothTransitions: true,
+  child: Scaffold(
+    backgroundColor: Colors.transparent,
+    body: YourContent(),
+  ),
+)
+```
 
-1. **Dynamic Theme Extraction** - Extract vibrant colors from images
-2. **Smooth Animations** - Animated theme transitions using `PaletteScope`
-3. **Blurred Backgrounds** - Create beautiful image backgrounds
-4. **WCAG Contrast** - Accessible color schemes
-
-## Running the Example
+## Running it
 
 ```bash
 cd example
-flutter pub get
 flutter run
 ```
 
-## Basic Usage
+The platform folders are kept in the repository. If you are working from the
+copy published on pub.dev, which leaves them out, run `flutter create .` in
+this folder first.
 
-```dart
-import 'package:adaptive_palette/adaptive_palette.dart';
-import 'package:flutter/material.dart';
+## Legacy examples
 
-void main() {
-  runApp(
-    const PaletteScope(
-      seed: ThemeColors.fallback(),
-      brightness: Brightness.dark,
-      child: MyApp(),
-    ),
-  );
-}
+[lib/legacy/](lib/legacy/) holds examples for the deprecated v2 API
+(`AdaptivePalette`, `PaletteScope` and the `Adaptive*` widgets), which will be
+removed in 4.0.0. Run one with, for example:
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: PaletteScope.of(context).theme,
-      home: const HomePage(),
-    );
-  }
-}
-```
-
-## Extract Colors from Image
-
-```dart
-final colors = await AdaptivePalette.fromImage(
-  const NetworkImage('https://example.com/image.jpg'),
-  targetBrightness: Brightness.dark,
-  resize: 64,
-  quantizeColors: 32,
-  minContrast: 4.5,
-);
-
-// Animate to new theme
-PaletteScope.of(context).animateTo(colors);
+```bash
+flutter run -t lib/legacy/palette_scope_example.dart
 ```

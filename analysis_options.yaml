@@ -4,6 +4,8 @@ analyzer:
   exclude:
     - build/**
     - example/build/**
+    # Separate package with its own dependencies (needs Flutter 3.47+).
+    - compat/**
   errors:
     # The deprecated v2 API has to keep referring to itself until it is
     # removed in 4.0.0.

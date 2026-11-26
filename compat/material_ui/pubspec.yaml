@@ -1,0 +1,19 @@
+name: adaptive_palette_material_ui_compat
+description: Checks that adaptive_palette works inside apps built on the material_ui package.
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+  flutter: '>=3.47.0'
+
+dependencies:
+  adaptive_palette:
+    path: ../../
+  flutter:
+    sdk: flutter
+  material_ui: ^1.5.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

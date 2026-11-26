@@ -1,6 +1,9 @@
-/// Example demonstrating FluidBackground widget.
+/// Music-player style demo of the FluidBackground widget.
 ///
-/// Run with: flutter run -t lib/fluid_background_example.dart
+/// Skip between tracks to see the background follow the album art. The two
+/// switches in the app bar toggle the orbital motion and smooth crossfades.
+///
+/// Run with: flutter run
 library;
 
 import 'package:adaptive_palette/adaptive_palette.dart';
@@ -31,6 +34,8 @@ class MusicPlayerPage extends StatefulWidget {
 
 class _MusicPlayerPageState extends State<MusicPlayerPage> {
   int _currentIndex = 0;
+  bool _animate = true;
+  bool _smoothTransitions = true;
 
   final List<String> _albumImages = [
     'https://picsum.photos/seed/album1/800/800',
@@ -72,7 +77,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       imageProvider: NetworkImage(_albumImages[_currentIndex]),
       blurSigma: 80,
       overlayDarken: 0.15,
-      animate: true,
+      animate: _animate,
+      smoothTransitions: _smoothTransitions,
       transitionDuration: const Duration(milliseconds: 1400),
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -87,8 +93,19 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
           centerTitle: true,
           actions: [
             IconButton(
-              icon: const Icon(Icons.more_vert),
-              onPressed: () {},
+              tooltip: _animate ? 'Pause motion' : 'Animate background',
+              icon: Icon(
+                  _animate ? Icons.motion_photos_on : Icons.motion_photos_off),
+              onPressed: () => setState(() => _animate = !_animate),
+            ),
+            IconButton(
+              tooltip: _smoothTransitions
+                  ? 'Cut between images'
+                  : 'Crossfade between images',
+              icon: Icon(_smoothTransitions ? Icons.blur_on : Icons.blur_off),
+              onPressed: () => setState(
+                () => _smoothTransitions = !_smoothTransitions,
+              ),
             ),
           ],
         ),
@@ -110,7 +127,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           blurRadius: 40,
                           offset: const Offset(0, 20),
                         ),
@@ -204,7 +221,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),

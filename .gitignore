@@ -47,6 +47,9 @@ app.*.map.json
 # Example app
 example/.flutter-plugins-dependencies
 example/pubspec.lock
+
+# Compatibility check package
+compat/*/pubspec.lock
 example/.idea/
 example/*.iml
 

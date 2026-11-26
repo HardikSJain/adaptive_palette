@@ -32,16 +32,14 @@
 /// ```dart
 /// import 'package:adaptive_palette/adaptive_palette.dart';
 ///
-/// // Extract palette from image
-/// final image = await loadImageFromProvider(NetworkImage(url));
-/// final palette = await FluidPaletteExtractor.extract(image);
+/// // Extract the dominant colors of an image, most dominant first
+/// final colors = await FluidPaletteExtractor.extractColors(
+///   NetworkImage(url),
+///   count: 5,
+/// );
 ///
 /// // Use colors
-/// Container(color: palette.baseDark);       // Dark base
-/// Container(color: palette.accent1);        // Top-left glow
-/// Container(color: palette.accent2);        // Top-right glow
-/// Container(color: palette.accent3);        // Bottom-left glow
-/// Container(color: palette.accent4);        // Bottom-right glow
+/// Container(color: colors.first);
 /// ```
 ///
 /// # Full Configuration
@@ -52,6 +50,7 @@
 ///   blurSigma: 80,              // Blur intensity (60-120)
 ///   overlayDarken: 0.10,         // Dark overlay for legibility (0.05-0.20)
 ///   animate: true,               // Enable orbital motion
+///   smoothTransitions: true,     // Crossfade between images
 ///   transitionDuration: Duration(milliseconds: 1400),
 ///   child: YourContent(),
 /// )
@@ -86,7 +85,7 @@ import 'src/theme.dart';
 // ==================== PRIMARY API ====================
 // These are the main APIs you should use:
 
-/// Load ui.Image from ImageProvider for color extraction
+/// Load a ui.Image from an ImageProvider (the caller disposes it)
 export 'src/extraction.dart' show loadImageFromProvider;
 
 /// FluidPaletteExtractor - Extract colors from images; FluidPaletteCache - LRU cache
@@ -136,11 +135,14 @@ export 'src/widgets/adaptive_image_overlay.dart';
 ///
 /// New usage:
 /// ```dart
-/// final image = await loadImageFromProvider(NetworkImage(url));
-/// final palette = await FluidPaletteExtractor.extract(image);
+/// final colors = await FluidPaletteExtractor.extractColors(
+///   NetworkImage(url),
+/// );
 /// ```
 @Deprecated(
-    'Use FluidPaletteExtractor.extract() instead. Will be removed in v4.0.0')
+  'Use FluidPaletteExtractor.extractColors() instead. '
+  'Will be removed in v4.0.0',
+)
 class AdaptivePalette {
   AdaptivePalette._(); // Private constructor - all methods are static
 

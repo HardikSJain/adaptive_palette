@@ -20,7 +20,9 @@ Create stunning, music app-style backgrounds that adapt to your images with smoo
 🌊 **Smooth Transitions** - Cross-fade between images with palette color tweening
 💫 **Corner Accent Glows** - Radial gradients using extracted colors
 🎭 **Matte Treatment** - Prevents harsh whites, ensures rich vibrant colors
-⚡ **Performance Optimized** - Instant fallback, background extraction, 60fps animations
+⚡ **Performance Optimized** - Instant fallback, cached extraction, isolated repaints
+♿ **Respects Reduced Motion** - The orbit pauses when the platform asks for less motion
+🌐 **Runs Everywhere** - Android, iOS, web (including WebAssembly), macOS, Windows, Linux
 
 ## Installation
 
@@ -76,8 +78,8 @@ Container(color: colors[0]);
 GradientBackground(colors: colors);
 ```
 
-Results are automatically cached by image content hash — repeated calls with
-the same image return instantly.
+Results are cached by image content, so repeated calls with the same image
+skip the clustering step.
 
 #### Pre-warming the cache
 
@@ -115,7 +117,8 @@ FluidBackground(
   // Dark overlay for text legibility (0.05-0.20 recommended)
   overlayDarken: 0.10,
 
-  // Enable slow orbital motion (off by default — battery friendly)
+  // Enable slow orbital motion (off by default — battery friendly).
+  // Pauses automatically when the platform requests reduced motion.
   animate: true,
 
   // Fallback palette when no image is set (dark / light / auto)
@@ -125,7 +128,7 @@ FluidBackground(
   transitionDuration: Duration(milliseconds: 1400),
 
   // Keep the previous image on screen and crossfade to the new one
-  // (off by default — drops to the matte fallback while loading)
+  // (off by default — cuts to the matte fallback while loading)
   smoothTransitions: true,
 
   child: YourContent(),
@@ -140,10 +143,29 @@ FluidBackground(
 | `child` | `Widget` | required | Content to display on top |
 | `blurSigma` | `double` | `80` | Blur intensity (higher = softer) |
 | `overlayDarken` | `double` | `0.10` | Overlay opacity for text legibility |
-| `animate` | `bool` | `false` | Enable orbital motion animation (battery-friendly default) |
-| `fallbackMode` | `FluidFallbackMode` | `auto` | Fallback palette when no image: `dark`, `light`, or `auto` (matches theme brightness) |
-| `transitionDuration` | `Duration` | `1400ms` | Palette transition duration |
-| `smoothTransitions` | `bool` | `false` | Keep the previous image and palette visible while a new image loads, then crossfade to it instead of dropping to the matte fallback. A failed load keeps the current background |
+| `animate` | `bool` | `false` | Enable orbital motion animation (battery-friendly default). Runs only while an image is showing and pauses when the platform requests reduced motion |
+| `fallbackMode` | `FluidFallbackMode` | `auto` | Fallback palette when no image: `dark`, `light`, or `auto` (matches the Material theme brightness, or the platform brightness when there is no Material theme) |
+| `transitionDuration` | `Duration` | `1400ms` | Duration of the reveal and of crossfades |
+| `smoothTransitions` | `bool` | `false` | Keep the current image and palette visible while a new image loads, then crossfade to it instead of cutting to the matte fallback. Setting the image to `null` fades out, and a failed load keeps the current background |
+
+### Smooth transitions
+
+By default, changing `imageProvider` cuts to the matte fallback and fades the
+new image in once it has loaded. With `smoothTransitions: true` the current
+background stays up until the new image is ready and then crossfades to it:
+
+```dart
+FluidBackground(
+  imageProvider: NetworkImage(track.albumArtUrl),
+  smoothTransitions: true,
+  child: YourContent(),
+)
+```
+
+A crossfade that is already running always finishes before the next one
+starts, so an image that loads mid-transition appears up to one
+`transitionDuration` later. Skipping quickly through several images collapses
+into a single crossfade to the latest one.
 
 ## FluidPalette Model
 
@@ -299,10 +321,28 @@ Perfect for:
 
 ### Performance
 
-- **Fast startup**: Matte fallback shows instantly (0ms)
-- **Background loading**: Image extraction doesn't block UI
-- **Smooth animations**: 60fps orbital motion with GPU acceleration
-- **Memory efficient**: Downsampled color sampling, shader caching
+- **Fast startup**: The matte fallback shows on the first frame
+- **Cheap extraction**: One pixel in a hundred is sampled, and results are
+  cached by image content (30 entries, LRU). Pre-warm with
+  `FluidPaletteExtractor.warmup` to skip the work on first display
+- **Isolated repaints**: The background paints in its own layer. Its
+  animation does not repaint your content, and your content's repaints (a
+  progress bar, say) do not repaint the background
+- **No idle work**: The orbit only schedules frames while an image is showing
+- **Memory**: Images are released as soon as they are no longer shown
+
+### Image caching
+
+`FluidBackground` accepts any `ImageProvider`. Flutter's `NetworkImage` caches
+in memory only; to cache on disk, pass a provider from a caching package such
+as `CachedNetworkImageProvider` from
+[cached_network_image](https://pub.dev/packages/cached_network_image).
+
+### Accessibility
+
+When the platform asks for reduced motion (`MediaQuery.disableAnimations`),
+the orbit stays still even with `animate: true`, and transitions become
+near-instant.
 
 ### Common Patterns
 
@@ -335,18 +375,43 @@ FluidBackground(
 
 Check out the [example](example/) directory for complete, runnable examples:
 
-- **[fluid_background_example.dart](example/lib/fluid_background_example.dart)** - Full music player with playlist
+- **[main.dart](example/lib/main.dart)** - Full music player with playlist,
+  with switches for the orbit and smooth transitions
 
 Run the example:
 ```bash
 cd example
-flutter run -t lib/fluid_background_example.dart
+flutter run
 ```
 
 ## Requirements
 
-- Flutter SDK: >=3.0.0
-- Dart SDK: >=3.0.0 <4.0.0
+- Flutter 3.27 or newer (Dart 3.6 or newer)
+- Tested on Flutter 3.27, the current stable release and the current beta
+- All Flutter platforms, including web compiled to WebAssembly
+- No plugins and no native code: the only dependencies are `crypto` and
+  `material_color_utilities`
+
+### Apps built on `material_ui`
+
+Flutter 3.47 moved Material into the separate
+[material_ui](https://pub.dev/packages/material_ui) package. This package
+still builds on the Material library bundled with the SDK, so that it keeps
+working on Flutter releases older than 3.47. It works in `material_ui` apps
+as it is, with one thing to know: a theme from `material_ui` is not visible
+to it, so `FluidFallbackMode.auto` follows the platform brightness there.
+To follow your app theme instead, either wrap the app in
+`MaterialUiCompatibilityBridge` (from `material_ui`) or pass the mode
+yourself:
+
+```dart
+FluidBackground(
+  fallbackMode: Theme.of(context).brightness == Brightness.dark
+      ? FluidFallbackMode.dark
+      : FluidFallbackMode.light,
+  child: YourContent(),
+)
+```
 
 ## Migration from v2.x
 
@@ -373,8 +438,7 @@ FluidBackground(
 )
 
 // Or manual extraction
-final image = await loadImageFromProvider(NetworkImage(url));
-final palette = await FluidPaletteExtractor.extract(image);
+final colors = await FluidPaletteExtractor.extractColors(NetworkImage(url));
 ```
 
 Old widgets will be removed in v4.0.0:
@@ -396,6 +460,10 @@ Old widgets will be removed in v4.0.0:
 ### Animation is choppy
 - Reduce `blurSigma` (try 60)
 - Disable animation: `animate: false`
+
+### The background does not move
+- `animate` is `false` by default
+- The orbit pauses while the platform's reduced-motion setting is on
 
 ### Image doesn't load
 - Check network connectivity
