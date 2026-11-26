@@ -26,7 +26,7 @@ Create stunning, music app-style backgrounds that adapt to your images with smoo
 
 ```yaml
 dependencies:
-  adaptive_palette: ^3.1.0
+  adaptive_palette: ^3.2.0
 ```
 
 ## Quick Start
@@ -124,6 +124,10 @@ FluidBackground(
   // Transition duration for palette changes
   transitionDuration: Duration(milliseconds: 1400),
 
+  // Keep the previous image on screen and crossfade to the new one
+  // (off by default — drops to the matte fallback while loading)
+  smoothTransitions: true,
+
   child: YourContent(),
 )
 ```
@@ -139,6 +143,7 @@ FluidBackground(
 | `animate` | `bool` | `false` | Enable orbital motion animation (battery-friendly default) |
 | `fallbackMode` | `FluidFallbackMode` | `auto` | Fallback palette when no image: `dark`, `light`, or `auto` (matches theme brightness) |
 | `transitionDuration` | `Duration` | `1400ms` | Palette transition duration |
+| `smoothTransitions` | `bool` | `false` | Keep the previous image and palette visible while a new image loads, then crossfade to it instead of dropping to the matte fallback. A failed load keeps the current background |
 
 ## FluidPalette Model
 
