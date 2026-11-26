@@ -97,7 +97,8 @@ export 'src/cache.dart' show FluidPaletteCache, FluidCacheEntry;
 export 'src/fluid_palette.dart';
 
 /// FluidBackground - Immersive animated background widget
-export 'src/widgets/fluid_background.dart';
+export 'src/widgets/fluid_background.dart'
+    show FluidBackground, FluidFallbackMode;
 
 // ==================== DEPRECATED (will be removed in v4.0.0) ====================
 // These APIs are maintained for backward compatibility only.
