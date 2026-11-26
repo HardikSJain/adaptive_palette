@@ -215,6 +215,16 @@ int _maxDelta(Uint8List a, Uint8List b) {
   return maxDelta;
 }
 
+/// Average per-channel difference between two raw RGBA captures.
+double _meanDelta(Uint8List a, Uint8List b) {
+  expect(a.length, b.length);
+  int sum = 0;
+  for (int i = 0; i < a.length; i++) {
+    sum += (a[i] - b[i]).abs();
+  }
+  return sum / a.length;
+}
+
 /// Hosts a [FluidBackground] whose configuration can be changed with
 /// [_HostState.update].
 class _Host extends StatefulWidget {
@@ -222,12 +232,14 @@ class _Host extends StatefulWidget {
     this.imageProvider,
     this.smoothTransitions = false,
     this.animate = false,
+    this.blurSigma = 80,
     this.child = const SizedBox.expand(),
   });
 
   final ImageProvider? imageProvider;
   final bool smoothTransitions;
   final bool animate;
+  final double blurSigma;
   final Widget child;
 
   @override
@@ -253,6 +265,7 @@ class _HostState extends State<_Host> {
                 imageProvider: imageProvider,
                 smoothTransitions: smoothTransitions,
                 animate: animate,
+                blurSigma: widget.blurSigma,
                 transitionDuration: transitionDuration,
                 child: widget.child,
               )
@@ -700,13 +713,17 @@ void main() {
 
     testWidgets('the orbit is continuous across the cycle wrap',
         (tester) async {
+      // A light blur, so that a jump in rotation is clearly visible.
       await tester.pumpWidget(
-        _Host(imageProvider: _StaticImage(_red), animate: true),
+        _Host(imageProvider: _StaticImage(_red), blurSigma: 4),
       );
       await _settleOn(tester, _red);
 
-      // The cycle is 12s and starts at phase 0.35, so it wraps 7.8s in.
-      // Compare the frames 16ms either side of the wrap.
+      // Start the orbit now, so its clock starts at a known point: the cycle
+      // is 12s and starts at phase 0.35, so it wraps 7.8s in. Compare the
+      // frames 16ms either side of the wrap.
+      _host(tester).update(() => _host(tester).animate = true);
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 7800 - 16));
       final Uint8List beforeWrap = await _capture(tester);
       await tester.pump(const Duration(milliseconds: 32));
@@ -714,10 +731,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 32));
       final Uint8List next = await _capture(tester);
 
-      // The step across the wrap is no bigger than an ordinary step.
-      final int wrapStep = _maxDelta(beforeWrap, afterWrap);
-      final int ordinaryStep = _maxDelta(afterWrap, next);
-      expect(wrapStep, lessThanOrEqualTo(ordinaryStep + 2));
+      // The step across the wrap is about the size of an ordinary step. A
+      // rotation that snapped back at the wrap would move the whole picture.
+      final double wrapStep = _meanDelta(beforeWrap, afterWrap);
+      final double ordinaryStep = _meanDelta(afterWrap, next);
+      expect(ordinaryStep, greaterThan(0));
+      expect(wrapStep, lessThan(ordinaryStep * 1.5));
     });
 
     testWidgets('does not schedule frames while there is no image to move',
