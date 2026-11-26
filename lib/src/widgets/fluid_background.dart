@@ -5,11 +5,12 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../extraction.dart';
 import '../fluid_extractor.dart';
 import '../fluid_palette.dart';
+import '../material.dart';
 
 /// Fallback palette mode when image is unavailable or extraction fails.
 enum FluidFallbackMode {
@@ -19,7 +20,12 @@ enum FluidFallbackMode {
   /// Always use the light fallback palette.
   light,
 
-  /// Match fallback palette to [Theme.of(context).brightness].
+  /// Match the fallback palette to the surrounding app.
+  ///
+  /// Uses the brightness of the nearest Material [Theme]. When there is none
+  /// (for example in a Cupertino app, or an app built on the separate
+  /// `material_ui` package without its compatibility bridge), the platform
+  /// brightness from [MediaQuery] is used instead.
   auto,
 }
 
@@ -31,7 +37,8 @@ enum FluidFallbackMode {
 /// - **Heavy blur** - 80σ blur for soft, atmospheric effect
 /// - **Corner glows** - Radial gradients using extracted accent colors
 /// - **Smooth transitions** - Palette colors tween during image changes
-/// - **Optional animation** - Slow orbital motion (12s cycle)
+/// - **Optional animation** - Slow orbital motion (12s cycle), paused
+///   automatically when the platform asks for reduced motion
 ///
 /// Usage:
 /// ```dart
@@ -103,6 +110,8 @@ class FluidBackground extends StatefulWidget {
   /// Enable slow orbital motion animation.
   ///
   /// When true, shader layers slowly rotate and translate (12s cycle).
+  /// The motion only runs while an image is on screen, and is paused when the
+  /// platform requests reduced motion ([MediaQueryData.disableAnimations]).
   /// Default: false (battery-friendly, deterministic fallback)
   final bool animate;
 
@@ -120,10 +129,18 @@ class FluidBackground extends StatefulWidget {
   /// Smoothly crossfade between the previous and the new image.
   ///
   /// When true, changing [imageProvider] keeps the previous image and palette
-  /// fully visible until the new one loads, then fades the new fluid layers
-  /// in on top instead of dropping to the matte fallback first.
+  /// fully visible until the new one loads, then crossfades to it instead of
+  /// dropping to the matte fallback first. Setting [imageProvider] to null
+  /// fades the current image out to the matte fallback.
   ///
-  /// Default: false (original behavior)
+  /// A transition that is already running always finishes before the next one
+  /// starts, so an image that loads mid-transition appears up to one
+  /// [transitionDuration] later. Rapid changes collapse into a single
+  /// transition to the latest image.
+  ///
+  /// If the new image fails to load, the current background stays on screen.
+  ///
+  /// Default: false (cut to the matte fallback while the new image loads)
   final bool smoothTransitions;
 
   @override
@@ -132,34 +149,42 @@ class FluidBackground extends StatefulWidget {
 
 class _FluidBackgroundState extends State<FluidBackground>
     with TickerProviderStateMixin {
-  ui.Image? _image;
-  ui.Image? _previousImage;
-  FluidPalette? _palette;
-  FluidPalette? _previousPalette;
-
   static const Duration _motionDuration = Duration(seconds: 12);
+
+  /// Orbit phase shown while the motion is not running.
+  static const double _restingMotionPhase = 0.35;
+
+  /// The image and palette being shown (or revealed). Both are null while the
+  /// matte fallback is the target.
+  ui.Image? _image;
+  FluidPalette? _palette;
+
+  /// What the running smooth transition started from. A null palette stands
+  /// for the matte fallback.
+  ui.Image? _outgoingImage;
+  FluidPalette? _outgoingPalette;
 
   late final AnimationController _motionController = AnimationController(
     vsync: this,
     duration: _motionDuration,
+    value: _restingMotionPhase,
   );
-
-  double _frozenMotionT = 0.35;
-  int _motionSession = 0;
-  int _loadSession = 0;
-
-  /// The in-flight reveal, or null when idle. New commits wait for it so the
-  /// displayed blend always completes before the next crossfade starts.
-  Future<void>? _activeReveal;
-
-  /// Bumped whenever a reveal starts; a reveal's completion cleanup runs only
-  /// if it still owns the latest reveal.
-  int _revealSession = 0;
 
   late final AnimationController _revealController = AnimationController(
     vsync: this,
     duration: widget.transitionDuration,
   );
+
+  int _loadSession = 0;
+
+  /// Completes when the running reveal ends, however it ends. Null when idle.
+  /// New commits wait for it so the blend on screen always completes before
+  /// the next transition starts.
+  Future<void>? _activeReveal;
+
+  /// Bumped whenever a reveal starts or is cancelled; a reveal's completion
+  /// cleanup runs only if it still owns the latest reveal.
+  int _revealSession = 0;
 
   FluidPalette _fallbackFor(BuildContext context) {
     switch (widget.fallbackMode) {
@@ -168,261 +193,257 @@ class _FluidBackgroundState extends State<FluidBackground>
       case FluidFallbackMode.light:
         return const FluidPalette.fallbackLight();
       case FluidFallbackMode.auto:
-        final brightness = Theme.of(context).brightness;
-        return brightness == Brightness.light
+        return _ambientBrightness(context) == Brightness.light
             ? const FluidPalette.fallbackLight()
             : const FluidPalette.fallback();
     }
   }
 
+  /// Brightness of the surrounding app.
+  ///
+  /// `Theme.of` silently returns a light fallback theme when no Material
+  /// theme is installed, so check for one first and otherwise follow the
+  /// platform brightness.
+  static Brightness _ambientBrightness(BuildContext context) {
+    if (context.findAncestorWidgetOfExactType<Theme>() != null) {
+      return Theme.of(context).brightness;
+    }
+    return MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light;
+  }
+
   @override
   void initState() {
     super.initState();
-    if (widget.animate) {
-      _resumeMotionFromFrozen();
-    }
     _kickLoad();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduced motion can be switched on or off at any time.
+    _syncMotion();
   }
 
   @override
   void didUpdateWidget(covariant FluidBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.animate != widget.animate) {
-      if (widget.animate) {
-        _resumeMotionFromFrozen();
-      } else {
-        _freezeMotion();
-      }
-      if (mounted) setState(() {});
+    if (oldWidget.transitionDuration != widget.transitionDuration) {
+      _revealController.duration = widget.transitionDuration;
     }
-
-    if (oldWidget.smoothTransitions != widget.smoothTransitions) {
-      _previousImage = null;
-      _previousPalette = null;
-      if (mounted) setState(() {});
-    }
-
     if (oldWidget.imageProvider != widget.imageProvider) {
       _kickLoad();
     }
-  }
-
-  void _freezeMotion() {
-    _motionSession++;
-    _frozenMotionT = _motionController.value;
-    _motionController.stop(canceled: false);
-  }
-
-  void _resumeMotionFromFrozen() {
-    final int session = ++_motionSession;
-
-    _motionController.value = _frozenMotionT;
-    final remaining = (1.0 - _frozenMotionT).clamp(0.0, 1.0).toDouble();
-
-    if (remaining <= 0.0001) {
-      _motionController.repeat();
-      return;
-    }
-
-    final remainingMs =
-        (_motionDuration.inMilliseconds * remaining).round().clamp(1, 600000);
-
-    _motionController
-        .animateTo(
-      1.0,
-      duration: Duration(milliseconds: remainingMs),
-      curve: Curves.linear,
-    )
-        .then((_) {
-      if (!mounted || !widget.animate || session != _motionSession) return;
-      _motionController.repeat();
-    }).catchError((_) {
-      // Safe to ignore ticker cancellation during rapid animate toggles.
-    });
+    _syncMotion();
   }
 
   @override
   void dispose() {
     _motionController.dispose();
     _revealController.dispose();
+    _image?.dispose();
+    _outgoingImage?.dispose();
     super.dispose();
+  }
+
+  /// Runs the orbit only while it can be seen: [FluidBackground.animate] is
+  /// on, the platform does not ask for reduced motion, and there is an image
+  /// to move. Stopping keeps the current phase, so resuming is seamless.
+  void _syncMotion() {
+    final bool reduceMotion =
+        MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final bool shouldRun = widget.animate &&
+        !reduceMotion &&
+        (_image != null || _outgoingImage != null);
+    if (shouldRun == _motionController.isAnimating) return;
+    if (shouldRun) {
+      // Continues from the current phase. Deliberately not animateTo/forward:
+      // those run 20x faster when the platform disables animations.
+      _motionController.repeat();
+    } else {
+      _motionController.stop();
+    }
   }
 
   void _kickLoad() {
     final int loadToken = ++_loadSession;
-
-    final provider = widget.imageProvider;
-    if (provider == null) {
-      // Resetting the value cancels the running reveal's ticker.
-      _revealController.value = 0;
-      _activeReveal = null;
-      _image = null;
-      _previousImage = null;
-      _palette = null;
-      _previousPalette = null;
-      setState(() {});
-      return;
-    }
+    final ImageProvider? provider = widget.imageProvider;
 
     if (!widget.smoothTransitions) {
-      // drop to the matte fallback until the image loads
-      _revealController.value = 0;
+      // Cut to the matte fallback until the new image (if any) has loaded.
+      _cancelReveal();
+      _image?.dispose();
+      _outgoingImage?.dispose();
       _image = null;
       _palette = null;
+      _outgoingImage = null;
+      _outgoingPalette = null;
+      if (provider == null) return;
+    } else if (provider == null && _image == null) {
+      // Nothing on screen to fade out.
+      return;
     }
-    // With smooth transitions, the previous image/palette stay on screen
-    // until the new one loads.
+    // With smooth transitions the current image and palette stay on screen
+    // until the new target is ready.
 
-    _load(provider, loadToken: loadToken);
+    unawaited(_resolve(provider, loadToken: loadToken));
   }
 
-  Future<void> _load(ImageProvider provider, {required int loadToken}) async {
-    try {
-      final ui.Image img = await loadImageFromProvider(provider);
-      final FluidPalette pal =
-          await FluidPaletteExtractor.buildPaletteFromImage(img);
+  Future<void> _resolve(
+    ImageProvider? provider, {
+    required int loadToken,
+  }) async {
+    ui.Image? image;
+    FluidPalette? palette;
 
-      if (!mounted || loadToken != _loadSession) return;
-
-      // Let the in-flight reveal finish so the displayed blend (e.g. an
-      // interrupted A-to-B crossfade) completes on screen before blending
-      // toward the new image. Superseded commits bail out at the checks
-      // below, so rapid provider changes collapse into a single crossfade
-      // to the latest image instead of piling up reveals.
-      final Future<void>? pending = _activeReveal;
-      if (pending != null) {
-        try {
-          await pending;
-        } catch (_) {
-          // The pending reveal was interrupted (reset/dispose); its state
-          // is already handled where the cancellation happened.
-        }
-        if (!mounted || loadToken != _loadSession) return;
-      }
-
-      setState(() {
-        if (widget.smoothTransitions && _image != null) {
-          // Keep the previous image/palette.
-          _previousImage = _image;
-          _previousPalette = _palette;
-        }
-        _image = img;
-        _palette = pal;
-      });
-
-      final int revealToken = ++_revealSession;
-      final Future<void> reveal = _revealController.forward(from: 0).orCancel;
-      _activeReveal = reveal;
+    if (provider != null) {
       try {
-        await reveal;
+        image = await loadImageFromProvider(provider);
+        palette = await FluidPaletteExtractor.buildPaletteFromImage(image);
       } catch (_) {
-        // The reveal was canceled (reset/dispose); that path already
-        // cleared the display state.
+        // Without smooth transitions the matte fallback is already showing;
+        // with them the current background simply stays on screen.
+        image?.dispose();
         return;
-      } finally {
-        if (identical(_activeReveal, reveal)) _activeReveal = null;
       }
-
-      if (!mounted || revealToken != _revealSession) return;
-      // Clear the state once the transition finishes.
-      setState(() {
-        _previousImage = null;
-        _previousPalette = null;
-      });
-    } catch (_) {
-      if (!mounted || loadToken != _loadSession) return;
-      if (!widget.smoothTransitions) {
-        _image = null;
-        _palette = null;
-        setState(() {});
-      }
-      // With smooth transitions the previous image stays on screen.
     }
+
+    // Let the running reveal finish so the blend on screen (e.g. an A-to-B
+    // crossfade) completes before blending toward the new target. Superseded
+    // loads bail out below, so rapid provider changes collapse into a single
+    // transition to the latest image instead of piling up reveals.
+    final Future<void>? pending = _activeReveal;
+    if (pending != null && mounted && loadToken == _loadSession) {
+      await pending;
+    }
+
+    if (!mounted || loadToken != _loadSession) {
+      image?.dispose();
+      return;
+    }
+    _commit(image, palette);
+  }
+
+  /// Makes [image] and [palette] the new target and reveals them. Both are
+  /// null when fading out to the matte fallback.
+  void _commit(ui.Image? image, FluidPalette? palette) {
+    setState(() {
+      _outgoingImage?.dispose();
+      if (widget.smoothTransitions) {
+        _outgoingImage = _image;
+        _outgoingPalette = _palette;
+      } else {
+        _image?.dispose();
+        _outgoingImage = null;
+        _outgoingPalette = null;
+      }
+      _image = image;
+      _palette = palette;
+    });
+    _syncMotion();
+
+    final int revealToken = ++_revealSession;
+    final Completer<void> done = Completer<void>();
+    _activeReveal = done.future;
+    _revealController.forward(from: 0).whenCompleteOrCancel(() {
+      if (identical(_activeReveal, done.future)) _activeReveal = null;
+      // Whoever cancelled or superseded this reveal owns the display state.
+      if (mounted && revealToken == _revealSession) {
+        setState(() {
+          _outgoingImage?.dispose();
+          _outgoingImage = null;
+          _outgoingPalette = null;
+        });
+        _syncMotion();
+      }
+      done.complete();
+    });
+  }
+
+  void _cancelReveal() {
+    _revealSession++;
+    _activeReveal = null;
+    // Setting the value stops the running ticker.
+    _revealController.value = 0;
   }
 
   @override
   Widget build(BuildContext context) {
-    final fallbackPalette = _fallbackFor(context);
-    // With smooth transitions the tween starts from the previous palette.
-    final FluidPalette from = _previousPalette ?? fallbackPalette;
-    final FluidPalette target = _palette ?? from;
-    final overlayColor = fallbackPalette.baseDark.computeLuminance() > 0.55
+    final FluidPalette fallback = _fallbackFor(context);
+    final FluidPalette from = _outgoingPalette ?? fallback;
+    final FluidPalette target = _palette ?? fallback;
+    final Color overlayColor = fallback.baseDark.computeLuminance() > 0.55
         ? Colors.white.withValues(alpha: widget.overlayDarken * 0.45)
         : Colors.black.withValues(alpha: widget.overlayDarken);
+    final bool hasImage = _image != null || _outgoingImage != null;
 
     return Scaffold(
-      backgroundColor: fallbackPalette.baseDark,
-      body: AnimatedBuilder(
-        animation: Listenable.merge([_motionController, _revealController]),
-        builder: (context, _) {
-          final double k = _revealController.value;
-          final double tMotion =
-              widget.animate ? _motionController.value : _frozenMotionT;
-          final FluidPalette current = FluidPalette.lerp(from, target, k);
+      backgroundColor: fallback.baseDark,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // The background paints into its own layer: its repaints (palette
+          // tween, orbit) do not repaint the content, and content repaints do
+          // not repaint the background.
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _revealController,
+              builder: (context, _) {
+                final FluidPalette current = FluidPalette.lerp(
+                  from,
+                  target,
+                  _revealController.value,
+                );
 
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // Matte fallback base (always visible)
-              _MatteFallbackBase(palette: current),
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Matte fallback base (always visible)
+                    _MatteFallbackBase(palette: current),
 
-              // Both images render inside ONE blur layer that never gets
-              // added or removed mid-transition.
-              // The crossfade alphas are baked into the paints so the
-              // rasterizer never re-decides how to composite the blur.
-              if (_image != null || _previousImage != null)
-                ImageFiltered(
-                  imageFilter: ui.ImageFilter.blur(
-                    sigmaX: widget.blurSigma,
-                    sigmaY: widget.blurSigma,
-                    tileMode: ui.TileMode.clamp,
-                  ),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Previous image, fading out over the second half of
-                      // the reveal (smooth transitions only)
-                      if (_previousImage != null)
-                        CustomPaint(
-                          painter: _FluidShaderPainter(
-                            image: _previousImage!,
-                            t: tMotion,
-                            opacity: 1 -
-                                Curves.easeInOutCubic.transform(
-                                  ((k - 0.5) * 2).clamp(0.0, 1.0),
-                                ),
+                    // Fluid shader layers. Outgoing and incoming images are
+                    // painted by one painter inside one blur layer, driven
+                    // directly by the animations, so neither the orbit nor
+                    // the crossfade rebuilds any widgets.
+                    if (hasImage)
+                      RepaintBoundary(
+                        child: ImageFiltered(
+                          imageFilter: ui.ImageFilter.blur(
+                            sigmaX: widget.blurSigma,
+                            sigmaY: widget.blurSigma,
+                            tileMode: ui.TileMode.clamp,
+                          ),
+                          child: CustomPaint(
+                            painter: FluidShaderPainter(
+                              image: _image,
+                              outgoingImage: _outgoingImage,
+                              reveal: _revealController,
+                              motion: _motionController,
+                            ),
                           ),
                         ),
-                      // Current image, fading in over the full reveal
-                      if (_image != null)
-                        CustomPaint(
-                          painter: _FluidShaderPainter(
-                            image: _image!,
-                            t: tMotion,
-                            opacity: Curves.easeInOutCubic.transform(k),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+                      ),
 
-              // Corner glows
-              _CornerGlows(
-                tl: current.accent1,
-                tr: current.accent2,
-                bl: current.accent3,
-                br: current.accent4,
-              ),
+                    // Corner glows
+                    _CornerGlows(
+                      tl: current.accent1,
+                      tr: current.accent2,
+                      bl: current.accent3,
+                      br: current.accent4,
+                    ),
 
-              // Adaptive overlay for legibility in dark/light fallback modes
-              Container(color: overlayColor),
+                    // Adaptive overlay for legibility in dark/light fallback
+                    // modes
+                    ColoredBox(color: overlayColor),
+                  ],
+                );
+              },
+            ),
+          ),
 
-              // User content
-              widget.child,
-            ],
-          );
-        },
+          // User content
+          widget.child,
+        ],
       ),
     );
   }
@@ -444,8 +465,8 @@ class _MatteFallbackBase extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                palette.accent1.withOpacity(0.55),
-                palette.accent2.withOpacity(0.45),
+                palette.accent1.withValues(alpha: 0.55),
+                palette.accent2.withValues(alpha: 0.45),
                 palette.baseDark,
               ],
               stops: const [0.0, 0.55, 1.0],
@@ -458,110 +479,205 @@ class _MatteFallbackBase extends StatelessWidget {
   }
 }
 
-/// Fluid shader painter with multiple transformed image layers.
-class _FluidShaderPainter extends CustomPainter {
-  _FluidShaderPainter({
+/// Paints the blurred fluid layers of a [FluidBackground].
+///
+/// Internal to the package; public only so tests can inspect it.
+@visibleForTesting
+class FluidShaderPainter extends CustomPainter {
+  /// Creates a painter for [image], optionally transitioning from
+  /// [outgoingImage] as [reveal] runs from 0 to 1.
+  FluidShaderPainter({
     required this.image,
-    required this.t,
-    required this.opacity,
-  });
+    required this.outgoingImage,
+    required this.reveal,
+    required this.motion,
+  }) : super(repaint: Listenable.merge([reveal, motion]));
 
-  final ui.Image image;
-  final double t;
-  final double opacity;
+  /// Image being revealed, or null when fading out to the matte fallback.
+  final ui.Image? image;
+
+  /// Image the transition started from, if any.
+  final ui.Image? outgoingImage;
+
+  /// Transition progress, 0 to 1.
+  final Animation<double> reveal;
+
+  /// Orbit phase, 0 to 1 per cycle.
+  final Animation<double> motion;
+
+  static const Color _backdrop = Color(0xFF0F1419);
+
+  static const List<_ShaderLayer> _layers = <_ShaderLayer>[
+    _ShaderLayer(
+      scale: 1.35,
+      rotFrom: -0.08,
+      rotTo: 0.10,
+      ampX: 0.10,
+      ampY: 0.08,
+      phase: 0.0,
+      alpha: 0.55,
+    ),
+    _ShaderLayer(
+      scale: 0.95,
+      rotFrom: 0.12,
+      rotTo: -0.06,
+      ampX: 0.18,
+      ampY: 0.14,
+      phase: 0.33,
+      alpha: 0.45,
+    ),
+    _ShaderLayer(
+      scale: 0.70,
+      rotFrom: -0.18,
+      rotTo: 0.04,
+      ampX: 0.22,
+      ampY: 0.18,
+      phase: 0.66,
+      alpha: 0.35,
+    ),
+    _ShaderLayer(
+      scale: 1.85,
+      rotFrom: 0.05,
+      rotTo: -0.12,
+      ampX: 0.06,
+      ampY: 0.06,
+      phase: 0.18,
+      alpha: 0.25,
+    ),
+  ];
+
+  /// Phase offset of the rotation wave. Chosen so the resting frame (motion
+  /// phase 0.35) has exactly the rotation it had in 3.1.0 and earlier, where
+  /// rotation was a linear ramp that jumped at every cycle wrap.
+  static final double _rotationPhase = math.acos(0.3) / (2 * math.pi) - 0.35;
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = const Color(0xFF0F1419).withValues(alpha: opacity),
-    );
+    final double t = motion.value;
+    final double incoming = Curves.easeInOutCubic.transform(reveal.value);
+    final ui.Image? current = image;
+    final ui.Image? outgoing = outgoingImage;
 
-    final layers = <_ShaderLayer>[
-      _ShaderLayer(
-        scale: 1.35,
-        rot: _oscillate(-0.08, 0.10, t),
-        dx: _orbitX(0.10, t),
-        dy: _orbitY(0.08, t),
-        alpha: 0.55,
-      ),
-      _ShaderLayer(
-        scale: 0.95,
-        rot: _oscillate(0.12, -0.06, t),
-        dx: _orbitX(0.18, t + 0.33),
-        dy: _orbitY(0.14, t + 0.33),
-        alpha: 0.45,
-      ),
-      _ShaderLayer(
-        scale: 0.70,
-        rot: _oscillate(-0.18, 0.04, t),
-        dx: _orbitX(0.22, t + 0.66),
-        dy: _orbitY(0.18, t + 0.66),
-        alpha: 0.35,
-      ),
-      _ShaderLayer(
-        scale: 1.85,
-        rot: _oscillate(0.05, -0.12, t),
-        dx: _orbitX(0.06, t + 0.18),
-        dy: _orbitY(0.06, t + 0.18),
-        alpha: 0.25,
-      ),
-    ];
+    if (outgoing != null) {
+      // Under an incoming image the outgoing one stays opaque, so the result
+      // is an exact crossfade that never lets the matte base show through.
+      // With nothing incoming it fades out to the matte base instead.
+      final double opacity = current == null ? 1.0 - incoming : 1.0;
+      if (current == null || incoming < 1.0) {
+        _paintImage(canvas, size, outgoing, t, opacity);
+      }
+    }
+    if (current != null) {
+      _paintImage(canvas, size, current, t, incoming);
+    }
+  }
 
-    for (final layer in layers) {
-      final Matrix4 m = Matrix4.identity()
-        ..translate(size.width * 0.5, size.height * 0.5)
-        ..translate(size.width * layer.dx, size.height * layer.dy)
-        ..rotateZ(layer.rot)
-        ..scale(layer.scale, layer.scale)
-        ..translate(-image.width / 2.0, -image.height / 2.0);
+  void _paintImage(
+    Canvas canvas,
+    Size size,
+    ui.Image image,
+    double t,
+    double opacity,
+  ) {
+    if (opacity <= 0.0) return;
+    final Rect rect = Offset.zero & size;
 
-      final paint = Paint()
+    // Fade the layers as one group; fading each layer separately would let
+    // the backdrop and lower layers show through mid-transition.
+    final bool group = opacity < 1.0;
+    if (group) {
+      canvas.saveLayer(
+        rect,
+        Paint()..color = Color.fromRGBO(0, 0, 0, opacity),
+      );
+    }
+
+    canvas.drawRect(rect, Paint()..color = _backdrop);
+
+    final Paint paint = Paint()..blendMode = ui.BlendMode.srcOver;
+    for (final _ShaderLayer layer in _layers) {
+      final double phase = t + layer.phase;
+      paint
         ..shader = ui.ImageShader(
           image,
           ui.TileMode.clamp,
           ui.TileMode.clamp,
-          m.storage,
+          _layerMatrix(
+            size: size,
+            image: image,
+            scale: layer.scale,
+            rotation: _oscillate(layer.rotFrom, layer.rotTo, t),
+            dx: math.sin(phase * 2 * math.pi) * layer.ampX,
+            dy: math.cos(phase * 2 * math.pi) * layer.ampY,
+          ),
         )
-        ..color = Colors.white.withValues(alpha: layer.alpha * opacity)
-        ..blendMode = ui.BlendMode.srcOver;
-
-      canvas.drawRect(Offset.zero & size, paint);
+        ..color = Color.fromRGBO(255, 255, 255, layer.alpha);
+      canvas.drawRect(rect, paint);
     }
+
+    if (group) canvas.restore();
+  }
+
+  /// Column-major 4x4 matrix that centers the image on the canvas, scales and
+  /// rotates it about its center, and offsets it by a fraction of the canvas.
+  static Float64List _layerMatrix({
+    required Size size,
+    required ui.Image image,
+    required double scale,
+    required double rotation,
+    required double dx,
+    required double dy,
+  }) {
+    final double cosR = math.cos(rotation) * scale;
+    final double sinR = math.sin(rotation) * scale;
+    final double halfW = image.width / 2.0;
+    final double halfH = image.height / 2.0;
+    final Float64List m = Float64List(16);
+    m[0] = cosR;
+    m[1] = sinR;
+    m[4] = -sinR;
+    m[5] = cosR;
+    m[10] = 1.0;
+    m[12] = size.width * (0.5 + dx) - cosR * halfW + sinR * halfH;
+    m[13] = size.height * (0.5 + dy) - sinR * halfW - cosR * halfH;
+    m[15] = 1.0;
+    return m;
+  }
+
+  /// Oscillates between [a] and [b] and back over one motion cycle, so the
+  /// value is continuous across the wrap of the repeating controller.
+  static double _oscillate(double a, double b, double t) {
+    final double wave =
+        0.5 - 0.5 * math.cos((t + _rotationPhase) * 2 * math.pi);
+    return a + (b - a) * wave;
   }
 
   @override
-  bool shouldRepaint(covariant _FluidShaderPainter oldDelegate) =>
-      oldDelegate.t != t ||
+  bool shouldRepaint(covariant FluidShaderPainter oldDelegate) =>
       oldDelegate.image != image ||
-      oldDelegate.opacity != opacity;
-
-  static double _lerp(double a, double b, double t) => a + (b - a) * t;
-
-  /// Oscillates between [a] and [b] over one motion cycle and back, so the
-  /// value is continuous across the wrap of the repeating controller.
-  static double _oscillate(double a, double b, double t) =>
-      _lerp(a, b, 0.5 - 0.5 * math.cos(t * 2 * math.pi));
-  static double _orbitX(double amp, double t) =>
-      math.sin(t * 2 * math.pi) * amp;
-  static double _orbitY(double amp, double t) =>
-      math.cos(t * 2 * math.pi) * amp;
+      oldDelegate.outgoingImage != outgoingImage ||
+      oldDelegate.reveal != reveal ||
+      oldDelegate.motion != motion;
 }
 
 /// Shader layer configuration.
 class _ShaderLayer {
   const _ShaderLayer({
     required this.scale,
-    required this.rot,
-    required this.dx,
-    required this.dy,
+    required this.rotFrom,
+    required this.rotTo,
+    required this.ampX,
+    required this.ampY,
+    required this.phase,
     required this.alpha,
   });
 
   final double scale;
-  final double rot;
-  final double dx;
-  final double dy;
+  final double rotFrom;
+  final double rotTo;
+  final double ampX;
+  final double ampY;
+  final double phase;
   final double alpha;
 }
 
@@ -596,8 +712,8 @@ class _CornerGlows extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 colors: [
-                  c.withOpacity(0.28),
-                  c.withOpacity(0.12),
+                  c.withValues(alpha: 0.28),
+                  c.withValues(alpha: 0.12),
                   Colors.transparent,
                 ],
                 stops: const [0.0, 0.55, 1.0],

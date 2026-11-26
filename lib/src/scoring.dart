@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:material_color_utilities/material_color_utilities.dart' as mcu;
 
+import 'color_utils.dart';
 import 'config.dart';
 import 'models.dart';
 
@@ -37,15 +38,15 @@ ImageCharacteristics analyzeImageCharacteristics(List<Swatch> swatches) {
 
   for (final s in swatches) {
     final c = s.color;
-    final r = (0x00ff0000 & c.value) >> 16;
-    final g = (0x0000ff00 & c.value) >> 8;
-    final b = (0x000000ff & c.value) >> 0;
+    final r = red8(c);
+    final g = green8(c);
+    final b = blue8(c);
 
     final maxCh = math.max(r, math.max(g, b)) / 255.0;
     final minCh = math.min(r, math.min(g, b)) / 255.0;
     final sat = maxCh == 0 ? 0.0 : (maxCh - minCh) / maxCh;
 
-    final cam = mcu.Cam16.fromInt(c.value);
+    final cam = mcu.Cam16.fromInt(argb32(c));
     final weight = s.population / totalPixels;
 
     avgSaturation += sat * weight;
@@ -119,14 +120,14 @@ double scoreColor(
   double diversityWeight = 1.1,
 }) {
   final c = swatch.color;
-  final r = (0x00ff0000 & c.value) >> 16;
-  final g = (0x0000ff00 & c.value) >> 8;
-  final b = (0x000000ff & c.value) >> 0;
+  final r = red8(c);
+  final g = green8(c);
+  final b = blue8(c);
 
   // Use CAM16 for perceptually accurate color analysis
-  final cam = mcu.Cam16.fromInt(c.value);
+  final cam = mcu.Cam16.fromInt(argb32(c));
   final chroma = cam.chroma;
-  final tone = mcu.Hct.fromInt(c.value).tone;
+  final tone = mcu.Hct.fromInt(argb32(c)).tone;
 
   // HSV saturation
   final maxCh = math.max(r, math.max(g, b)) / 255.0;
@@ -247,8 +248,8 @@ List<ScoredSwatch> scoreSwatches(
 
 /// Calculate perceptual color distance using simplified CAM16 distance.
 double computeColorDistance(Color c1, Color c2) {
-  final cam1 = mcu.Cam16.fromInt(c1.value);
-  final cam2 = mcu.Cam16.fromInt(c2.value);
+  final cam1 = mcu.Cam16.fromInt(argb32(c1));
+  final cam2 = mcu.Cam16.fromInt(argb32(c2));
 
   final dH = (cam1.hue - cam2.hue).abs();
   final dC = (cam1.chroma - cam2.chroma).abs();

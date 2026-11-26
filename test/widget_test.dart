@@ -1,5 +1,5 @@
 // Basic test for adaptive_palette package
-import 'package:flutter/material.dart';
+import 'package:adaptive_palette/src/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:adaptive_palette/adaptive_palette.dart';
 

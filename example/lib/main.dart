@@ -1,364 +1,273 @@
+/// Music-player style demo of the FluidBackground widget.
+///
+/// Skip between tracks to see the background follow the album art. The two
+/// switches in the app bar toggle the orbital motion and smooth crossfades.
+///
+/// Run with: flutter run
+library;
+
 import 'package:adaptive_palette/adaptive_palette.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 
-void main() {
-  runApp(
-    const PaletteScope(
-      seed: ThemeColors.fallback(),
-      brightness: Brightness.dark,
-      child: MyApp(),
-    ),
-  );
-}
+void main() => runApp(const FluidBackgroundExampleApp());
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class FluidBackgroundExampleApp extends StatelessWidget {
+  const FluidBackgroundExampleApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'FluidBackground Demo',
+      theme: ThemeData.dark(useMaterial3: true),
+      home: const MusicPlayerPage(),
       debugShowCheckedModeBanner: false,
-      theme: PaletteScope.of(context).theme,
-      home: const ExampleHomePage(),
     );
   }
 }
 
-class ExampleHomePage extends StatefulWidget {
-  const ExampleHomePage({super.key});
+class MusicPlayerPage extends StatefulWidget {
+  const MusicPlayerPage({super.key});
 
   @override
-  State<ExampleHomePage> createState() => _ExampleHomePageState();
+  State<MusicPlayerPage> createState() => _MusicPlayerPageState();
 }
 
-class _ExampleHomePageState extends State<ExampleHomePage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  ThemeColors? _extractedColors;
-  bool _isLoading = true;
+class _MusicPlayerPageState extends State<MusicPlayerPage> {
+  int _currentIndex = 0;
+  bool _animate = true;
+  bool _smoothTransitions = true;
 
-  static const String demoImage = 'https://picsum.photos/800/600';
+  final List<String> _albumImages = [
+    'https://picsum.photos/seed/album1/800/800',
+    'https://picsum.photos/seed/album2/800/800',
+    'https://picsum.photos/seed/album3/800/800',
+    'https://picsum.photos/seed/album4/800/800',
+  ];
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    );
-    _extractPalette();
-  }
+  final List<String> _songTitles = [
+    'Neon Dreams',
+    'Ocean Waves',
+    'Mountain Echo',
+    'City Lights',
+  ];
 
-  Future<void> _extractPalette() async {
-    // Extract colors from image
-    final colors = await AdaptivePalette.fromImage(
-      const NetworkImage(demoImage),
-      targetBrightness: Brightness.dark,
-      resize: 64,
-      quantizeColors: 32,
-      minContrast: 4.5,
-    );
+  final List<String> _artistNames = [
+    'Electric Pulse',
+    'Coastal Sound',
+    'Alpine Harmony',
+    'Urban Beats',
+  ];
 
-    if (!mounted) return;
-
+  void _nextSong() {
     setState(() {
-      _extractedColors = colors;
-      _isLoading = false;
+      _currentIndex = (_currentIndex + 1) % _albumImages.length;
     });
-
-    // Animate to new theme
-    PaletteScope.of(context).animateTo(
-      colors,
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeOutCubic,
-    );
-
-    _controller.forward();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void _previousSong() {
+    setState(() {
+      _currentIndex =
+          (_currentIndex - 1 + _albumImages.length) % _albumImages.length;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Blurred background
-          FadeTransition(
-            opacity: _fadeAnimation,
-            child: RepaintBoundary(
-              child: Transform.scale(
-                scale: 1.2,
-                child: ImageFiltered(
-                  imageFilter: ui.ImageFilter.blur(
-                    sigmaX: 80,
-                    sigmaY: 80,
-                    tileMode: TileMode.decal,
-                  ),
-                  child: Image.network(
-                    demoImage,
-                    fit: BoxFit.cover,
-                    frameBuilder:
-                        (context, child, frame, wasSynchronouslyLoaded) {
-                      if (wasSynchronouslyLoaded) return child;
-                      return frame != null
-                          ? child
-                          : Container(color: Colors.black);
-                    },
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: Colors.black),
-                  ),
-                ),
+    return FluidBackground(
+      imageProvider: NetworkImage(_albumImages[_currentIndex]),
+      blurSigma: 80,
+      overlayDarken: 0.15,
+      animate: _animate,
+      smoothTransitions: _smoothTransitions,
+      transitionDuration: const Duration(milliseconds: 1400),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.keyboard_arrow_down),
+            onPressed: () {},
+          ),
+          title: const Text('Now Playing'),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              tooltip: _animate ? 'Pause motion' : 'Animate background',
+              icon: Icon(
+                  _animate ? Icons.motion_photos_on : Icons.motion_photos_off),
+              onPressed: () => setState(() => _animate = !_animate),
+            ),
+            IconButton(
+              tooltip: _smoothTransitions
+                  ? 'Cut between images'
+                  : 'Crossfade between images',
+              icon: Icon(_smoothTransitions ? Icons.blur_on : Icons.blur_off),
+              onPressed: () => setState(
+                () => _smoothTransitions = !_smoothTransitions,
               ),
             ),
-          ),
+          ],
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Spacer(flex: 2),
 
-          // Color overlay
-          FadeTransition(
-            opacity: _fadeAnimation,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    scheme.surface.withOpacity(0.1),
-                    scheme.surface.withOpacity(0.3),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Content
-          SafeArea(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 40),
-
-                        // Title
-                        Text(
-                          'Adaptive Palette',
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            color: scheme.onSurface,
-                            letterSpacing: -1,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Dynamic theming from images',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: scheme.onSurface.withOpacity(0.7),
-                          ),
-                        ),
-                        const SizedBox(height: 48),
-
-                        // Image preview
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.network(
-                            demoImage,
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // Color palette
-                        if (_extractedColors != null)
-                          _ColorPaletteDisplay(colors: _extractedColors!),
-
-                        const SizedBox(height: 32),
-
-                        // Feature cards
-                        _FeatureCard(
-                          icon: Icons.palette,
-                          title: 'Smart Color Extraction',
-                          description:
-                              'Uses median-cut quantization to find vibrant colors',
-                        ),
-                        const SizedBox(height: 16),
-                        _FeatureCard(
-                          icon: Icons.accessibility_new,
-                          title: 'WCAG Contrast',
-                          description:
-                              'Ensures readable text with contrast guarantees',
-                        ),
-                        const SizedBox(height: 16),
-                        _FeatureCard(
-                          icon: Icons.animation,
-                          title: 'Smooth Transitions',
-                          description:
-                              'Animated theme changes with PaletteScope',
+                // Album art
+                Hero(
+                  tag: 'album-$_currentIndex',
+                  child: Container(
+                    width: 320,
+                    height: 320,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 40,
+                          offset: const Offset(0, 20),
                         ),
                       ],
                     ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.network(
+                        _albumImages[_currentIndex],
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+                ),
 
-class _ColorPaletteDisplay extends StatelessWidget {
-  final ThemeColors colors;
+                const Spacer(),
 
-  const _ColorPaletteDisplay({required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colors.surface.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.onSurface.withOpacity(0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Extracted Colors',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: colors.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _ColorChip(color: colors.primary, label: 'Primary'),
-              _ColorChip(color: colors.secondary, label: 'Secondary'),
-              _ColorChip(color: colors.background, label: 'Background'),
-              _ColorChip(color: colors.surface, label: 'Surface'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ColorChip extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const _ColorChip({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withOpacity(0.7),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FeatureCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-
-  const _FeatureCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: scheme.surface.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.onSurface.withOpacity(0.1)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 32, color: scheme.primary),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+                // Song info
                 Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
+                  _songTitles[_currentIndex],
+                  style: const TextStyle(
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: scheme.onSurface,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: scheme.onSurface.withOpacity(0.7),
+                  _artistNames[_currentIndex],
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: Colors.white70,
                   ),
+                  textAlign: TextAlign.center,
                 ),
+
+                const Spacer(),
+
+                // Progress bar
+                Column(
+                  children: [
+                    SliderTheme(
+                      data: SliderThemeData(
+                        trackHeight: 3,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 6,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 16,
+                        ),
+                      ),
+                      child: Slider(
+                        value: 0.3,
+                        onChanged: (value) {},
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('1:23', style: TextStyle(fontSize: 12)),
+                          Text('3:45', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Controls
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.shuffle),
+                      iconSize: 24,
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.skip_previous),
+                      iconSize: 40,
+                      onPressed: _previousSong,
+                    ),
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.pause,
+                        color: Colors.black87,
+                        size: 36,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.skip_next),
+                      iconSize: 40,
+                      onPressed: _nextSong,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.repeat),
+                      iconSize: 24,
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+
+                const Spacer(),
+
+                // Bottom actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.devices),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.favorite_border),
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

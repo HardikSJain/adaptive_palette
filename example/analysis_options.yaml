@@ -1,6 +1,19 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+  errors:
+    # The legacy/ examples intentionally demonstrate the deprecated v2 API.
+    deprecated_member_use: ignore
+
 linter:
   rules:
     prefer_const_constructors: false
-analyzer:
-  errors:
-    deprecated_member_use: ignore
+    avoid_print: false

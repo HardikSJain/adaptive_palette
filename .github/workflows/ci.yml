@@ -6,10 +6,81 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze & Format
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib test example/lib
+
+      - name: Analyze code
+        run: flutter analyze --fatal-infos --fatal-warnings
+
+  test:
+    name: Test (Flutter ${{ matrix.flutter }})
+    runs-on: ubuntu-latest
+    # A failure on beta is a heads-up about the next release, not a blocker.
+    continue-on-error: ${{ matrix.flutter == 'beta' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The first entry is the oldest supported release and must match the
+        # `flutter:` constraint in pubspec.yaml.
+        flutter: [ '3.27.4', stable, beta ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        if: matrix.flutter == 'stable' || matrix.flutter == 'beta'
+        with:
+          channel: ${{ matrix.flutter }}
+
+      - uses: subosito/flutter-action@v2
+        if: matrix.flutter != 'stable' && matrix.flutter != 'beta'
+        with:
+          flutter-version: ${{ matrix.flutter }}
+
+      # Resolve fresh, so each Flutter release gets the dependency versions it
+      # pins (the committed lockfile is for the current stable release).
+      - name: Install dependencies
+        run: |
+          rm -f pubspec.lock
+          flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze --fatal-warnings
+
+      - name: Run tests
+        run: flutter test --coverage
+
+      - name: Upload coverage to Codecov
+        if: matrix.flutter == 'stable'
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+  material-ui-compat:
+    name: material_ui compatibility
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: compat/material_ui
     steps:
       - uses: actions/checkout@v4
 
@@ -26,35 +97,27 @@ jobs:
       - name: Analyze code
         run: flutter analyze --fatal-infos --fatal-warnings
 
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - name: Install dependencies
-        run: flutter pub get
-
       - name: Run tests
-        run: flutter test --coverage
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
+        run: flutter test
 
   build:
-    name: Build
+    name: Build example (${{ matrix.target }})
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: web
+          - os: ubuntu-latest
+            target: linux
+          - os: macos-latest
+            target: macos
+          - os: windows-latest
+            target: windows
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: example
     steps:
       - uses: actions/checkout@v4
 
@@ -65,19 +128,23 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Build (web, WebAssembly)
+        if: matrix.target == 'web'
+        run: flutter build web --wasm
+
       - name: Build (Linux)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.target == 'linux'
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ninja-build libgtk-3-dev
           flutter build linux
 
       - name: Build (macOS)
-        if: matrix.os == 'macos-latest'
+        if: matrix.target == 'macos'
         run: flutter build macos
 
       - name: Build (Windows)
-        if: matrix.os == 'windows-latest'
+        if: matrix.target == 'windows'
         run: flutter build windows
 
   pub-dry-run:

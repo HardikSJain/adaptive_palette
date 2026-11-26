@@ -5,7 +5,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/painting.dart';
 
 import 'cache.dart';
 import 'extraction.dart';
@@ -25,8 +25,9 @@ import 'fluid_palette.dart';
 /// );
 /// ```
 ///
-/// Results are automatically cached in [FluidPaletteCache] by image content
-/// hash (SHA-1). Subsequent calls with the same image return instantly.
+/// Results are automatically cached in [FluidPaletteCache] by a hash of the
+/// pixels the algorithm samples. Subsequent calls with the same image return
+/// without re-running k-means.
 ///
 /// ## Pre-warming the cache
 ///
@@ -96,9 +97,12 @@ class FluidPaletteExtractor {
     final int clampedCount = count.clamp(1, 10);
 
     final ui.Image image = await loadImageFromProvider(provider);
-    final FluidCacheEntry entry = await _extractOrCache(image);
-
-    return entry.colors.take(clampedCount).toList();
+    try {
+      final FluidCacheEntry entry = await _extractOrCache(image);
+      return entry.colors.take(clampedCount).toList();
+    } finally {
+      image.dispose();
+    }
   }
 
   /// Pre-warm the [FluidPaletteCache] for a list of upcoming images.
@@ -118,7 +122,11 @@ class FluidPaletteExtractor {
       providers.map((provider) async {
         try {
           final ui.Image image = await loadImageFromProvider(provider);
-          await _extractOrCache(image);
+          try {
+            await _extractOrCache(image);
+          } finally {
+            image.dispose();
+          }
         } catch (_) {
           // Silently skip — warmup failures are non-fatal.
         }
@@ -164,8 +172,10 @@ class FluidPaletteExtractor {
   /// pipeline). For the common case, prefer [extractColors] which accepts an
   /// [ImageProvider] directly.
   ///
-  /// Results are cached by image content hash — repeated calls with the same
-  /// image bytes return instantly without re-running k-means.
+  /// Results are cached by a hash of the sampled pixels — repeated calls with
+  /// the same image return without re-running k-means.
+  ///
+  /// The [image] stays owned by the caller and is not disposed.
   static Future<FluidPalette> buildPaletteFromImage(ui.Image image) async {
     final FluidCacheEntry entry = await _extractOrCache(image);
     return entry.palette;
@@ -177,9 +187,10 @@ class FluidPaletteExtractor {
 
   /// Core extraction + cache logic.
   ///
-  /// Decodes [image] to raw bytes once, computes a content hash, returns the
-  /// cached [FluidCacheEntry] on hit, or runs the full pipeline on miss and
-  /// stores both [FluidPalette] and [List<Color>] representations together.
+  /// Decodes [image] to raw bytes once, hashes the pixels the pipeline
+  /// samples, returns the cached [FluidCacheEntry] on hit, or runs the full
+  /// pipeline on miss and stores both [FluidPalette] and [List<Color>]
+  /// representations together.
   static Future<FluidCacheEntry> _extractOrCache(ui.Image image) async {
     final ByteData? bd =
         await image.toByteData(format: ui.ImageByteFormat.rawRgba);
@@ -191,7 +202,7 @@ class FluidPaletteExtractor {
     }
 
     final Uint8List px = bd.buffer.asUint8List();
-    final String key = computeImageHash(px);
+    final String key = _sampleKey(px, image.width, image.height);
 
     final FluidCacheEntry? cached = FluidPaletteCache.instance.get(key);
     if (cached != null) return cached;
@@ -239,16 +250,47 @@ class FluidPaletteExtractor {
     );
   }
 
+  /// Distance in pixels between sampled rows and columns.
+  static const int _stride = 10;
+
+  /// Cache key for an image: its size plus exactly the pixels that
+  /// [_runPipeline] reads.
+  ///
+  /// Two images with the same key produce the same palette by construction,
+  /// and hashing one pixel in a hundred keeps large images from stalling the
+  /// UI thread (hashing every byte of a 3000x3000 image took far longer than
+  /// the clustering itself).
+  static String _sampleKey(Uint8List px, int w, int h) {
+    final int cols = (w + _stride - 1) ~/ _stride;
+    final int rows = (h + _stride - 1) ~/ _stride;
+    final Uint8List sampled = Uint8List(8 + cols * rows * 4);
+    ByteData.sublistView(sampled)
+      ..setUint32(0, w)
+      ..setUint32(4, h);
+
+    int o = 8;
+    for (int y = 0; y < h; y += _stride) {
+      for (int x = 0; x < w; x += _stride) {
+        final int i = (y * w + x) * 4;
+        if (i + 3 >= px.length) continue;
+        sampled[o++] = px[i];
+        sampled[o++] = px[i + 1];
+        sampled[o++] = px[i + 2];
+        sampled[o++] = px[i + 3];
+      }
+    }
+    return computeImageHash(sampled);
+  }
+
   /// Shared pixel sampling and weighted k-means clustering pipeline.
   ///
   /// Accepts pre-decoded [px] bytes to avoid double-decoding.
   /// Returns cluster centers sorted by perceptual vibrancy score.
   static List<_Vec3> _runPipeline(Uint8List px, int w, int h) {
     final List<_Vec3> samples = [];
-    const int stride = 10;
 
-    for (int y = 0; y < h; y += stride) {
-      for (int x = 0; x < w; x += stride) {
+    for (int y = 0; y < h; y += _stride) {
+      for (int x = 0; x < w; x += _stride) {
         final int i = (y * w + x) * 4;
         if (i + 3 >= px.length) continue;
 
@@ -266,8 +308,10 @@ class FluidPaletteExtractor {
         if (s.sat < 0.05 && s.lightness > 0.85) continue;
 
         // Weight by vibrancy and center proximity.
-        final double cx = (x / (w - 1)) - 0.5;
-        final double cy = (y / (h - 1)) - 0.5;
+        // A single row or column has no extent to be off-center along
+        // (and dividing by zero here would yield NaN).
+        final double cx = w > 1 ? (x / (w - 1)) - 0.5 : 0.0;
+        final double cy = h > 1 ? (y / (h - 1)) - 0.5 : 0.0;
         final double centerWeight =
             1.0 + (0.8 * (1.0 - (cx * cx + cy * cy).clamp(0.0, 1.0)));
         final double vib = s.sat * 0.75 + s.lightness * 0.25;
@@ -443,9 +487,19 @@ Color _amplify(Color c,
 
 /// Clamp the base color to a dark range suitable for white text (L ≤ 0.22).
 Color _ensureBaseDark(Color c) {
+  const double maxLightness = 0.22;
   final HSLColor hsl = HSLColor.fromColor(c);
-  if (hsl.lightness <= 0.22) return c;
-  return hsl.withLightness((hsl.lightness * 0.55).clamp(0.08, 0.22)).toColor();
+  if (hsl.lightness <= maxLightness) return c;
+
+  double lightness = (hsl.lightness * 0.55).clamp(0.08, maxLightness);
+  Color dark = hsl.withLightness(lightness).toColor();
+  // Rounding to 8-bit channels can land a hair above the limit; step down
+  // until the color actually honors it.
+  while (HSLColor.fromColor(dark).lightness > maxLightness && lightness > 0) {
+    lightness -= 1 / 510;
+    dark = hsl.withLightness(lightness).toColor();
+  }
+  return dark;
 }
 
 /// Replace near-white colors with a matte tinted gray.

@@ -1,8 +1,7 @@
 /// YouTube-style glow border widget.
 library;
 
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../material.dart';
 
 import '../config.dart';
 import '../models.dart';
@@ -73,7 +72,7 @@ class AdaptiveGlowImageFrame extends StatefulWidget {
   }) {
     return AdaptiveGlowImageFrame(
       key: key,
-      imageProvider: CachedNetworkImageProvider(imageUrl),
+      imageProvider: NetworkImage(imageUrl),
       aspectRatio: aspectRatio,
       borderRadius: borderRadius,
       blurRadius: blurRadius,
@@ -81,14 +80,10 @@ class AdaptiveGlowImageFrame extends StatefulWidget {
       layers: layers,
       tone: tone,
       fit: fit,
-      backgroundImage: CachedNetworkImage(
-        imageUrl: imageUrl,
+      backgroundImage: networkBackgroundImage(
+        imageUrl,
         fit: fit,
-        placeholder: (_, __) => const ColoredBox(color: Colors.black12),
-        errorWidget: (_, __, ___) => const ColoredBox(
-          color: Colors.black12,
-          child: Icon(Icons.broken_image, color: Colors.white54),
-        ),
+        showBrokenIcon: true,
       ),
       config: config,
       fallbackColors: fallbackColors,
@@ -137,7 +132,8 @@ class _AdaptiveGlowImageFrameState extends State<AdaptiveGlowImageFrame> {
       final t = (i + 1) / widget.layers;
       layers.add(
         BoxShadow(
-          color: Color.lerp(base, secondary, t)!.withOpacity(0.35 - (0.1 * i)),
+          color: Color.lerp(base, secondary, t)!
+              .withValues(alpha: 0.35 - (0.1 * i)),
           blurRadius: widget.blurRadius * (1 + 0.6 * i),
           spreadRadius: widget.spreadRadius * (1 + 0.3 * i),
         ),

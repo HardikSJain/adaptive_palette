@@ -1,25 +1,35 @@
 name: adaptive_palette
 description: Immersive fluid animated backgrounds from images. Weighted k-means color extraction, LRU cache, dark/light/auto fallback, and smooth orbital motion.
-version: 3.1.1
+version: 3.2.0
 homepage: https://github.com/HardikSJain/adaptive_palette
 repository: https://github.com/HardikSJain/adaptive_palette
 issue_tracker: https://github.com/HardikSJain/adaptive_palette/issues
 
+topics:
+  - color
+  - palette
+  - background
+  - animation
+  - theme
+
+screenshots:
+  - description: Fluid backgrounds generated from album and poster artwork.
+    path: adaptive_palette.png
+
 environment:
-  sdk: '>=3.5.0 <4.0.0'
-  flutter: '>=3.24.0'
+  sdk: ^3.6.0
+  flutter: '>=3.27.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  material_color_utilities: ^0.13.0
   crypto: ^3.0.3
-  cached_network_image: ^3.4.1
+  # The Flutter SDK pins this package to an exact version, so the range has to
+  # cover every supported Flutter release (0.11.1 on 3.27 up to 0.13.x today).
+  # Only the long-stable Hct and Cam16 classes are used.
+  material_color_utilities: '>=0.11.1 <0.14.0'
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
-
-flutter:
-  uses-material-design: true
+  flutter_lints: '>=5.0.0 <7.0.0'

@@ -1,8 +1,7 @@
 /// Full-screen scaffold with adaptive gradient background.
 library;
 
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../material.dart';
 
 import '../config.dart';
 import '../models.dart';
@@ -113,7 +112,7 @@ class AdaptiveGradientScaffold extends StatefulWidget {
   }) {
     return AdaptiveGradientScaffold(
       key: key,
-      imageProvider: CachedNetworkImageProvider(imageUrl),
+      imageProvider: NetworkImage(imageUrl),
       gradientStyle: gradientStyle,
       appBar: appBar,
       body: body,

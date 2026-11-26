@@ -40,23 +40,18 @@ app.*.symbols
 app.*.map.json
 
 # Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+/example/android/app/debug
+/example/android/app/profile
+/example/android/app/release
 
-# Example app - exclude unnecessary files for pub.dev
-example/.metadata
+# Example app
 example/.flutter-plugins-dependencies
 example/pubspec.lock
-example/android/
-example/ios/
-example/web/
-example/macos/
-example/windows/
-example/linux/
+
+# Compatibility check package
+compat/*/pubspec.lock
 example/.idea/
 example/*.iml
-example/test/widget_test.dart
 
 # FVM Version Cache
 .fvm/

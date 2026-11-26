@@ -1,7 +1,7 @@
 /// Configuration options for adaptive palette extraction.
 library;
 
-import 'package:flutter/material.dart';
+import 'dart:ui' show Brightness;
 
 /// Quality presets for color extraction.
 ///

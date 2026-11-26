@@ -1,7 +1,7 @@
 import 'package:adaptive_palette/src/config.dart';
 import 'package:adaptive_palette/src/models.dart';
 import 'package:adaptive_palette/src/scoring.dart';
-import 'package:flutter/material.dart';
+import 'package:adaptive_palette/src/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

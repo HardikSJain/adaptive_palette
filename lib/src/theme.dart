@@ -6,6 +6,7 @@ import 'dart:ui';
 
 import 'package:material_color_utilities/material_color_utilities.dart' as mcu;
 
+import 'color_utils.dart';
 import 'models.dart';
 
 /// Build a complete theme from a seed color.
@@ -18,9 +19,9 @@ ThemeColors buildTheme(
   double minContrast = 4.5,
 }) {
   // Build tonal palettes using HCT around the seed
-  final hct = mcu.Hct.fromInt(seed.value);
+  final hct = mcu.Hct.fromInt(argb32(seed));
   final hue = hct.hue;
-  final baseChroma = math.max(24.0, mcu.Cam16.fromInt(seed.value).chroma);
+  final baseChroma = math.max(24.0, mcu.Cam16.fromInt(argb32(seed)).chroma);
 
   Color tone(double t) {
     final h = mcu.Hct.from(hue, baseChroma, t);
@@ -91,7 +92,7 @@ Color findContrastingColor(
   required double minContrast,
   double preferTone = 20,
 }) {
-  final bgHct = mcu.Hct.fromInt(bg.value);
+  final bgHct = mcu.Hct.fromInt(argb32(bg));
   final bgLuminance = relativeLuminance(bg);
 
   // First, try pure white or black if they meet the requirement
@@ -143,7 +144,7 @@ Color ensureContrast(Color fg, Color bg, double minContrast) {
   if (computeContrastRatio(fg, bg) >= minContrast) return fg;
 
   // Shift tone using HCT towards contrast
-  final fgHct = mcu.Hct.fromInt(fg.value);
+  final fgHct = mcu.Hct.fromInt(argb32(fg));
   final bgLuminance = relativeLuminance(bg);
   final fgLuminance = relativeLuminance(fg);
   final shouldBeLighter = fgLuminance > bgLuminance;
@@ -200,10 +201,9 @@ double relativeLuminance(Color c) {
         : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
   }
 
-  // Use bit operations for compatibility
-  final r = f((0x00ff0000 & c.value) >> 16);
-  final g = f((0x0000ff00 & c.value) >> 8);
-  final b = f((0x000000ff & c.value) >> 0);
+  final r = f(red8(c));
+  final g = f(green8(c));
+  final b = f(blue8(c));
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 

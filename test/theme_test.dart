@@ -1,6 +1,6 @@
 import 'package:adaptive_palette/adaptive_palette.dart';
 import 'package:adaptive_palette/src/theme.dart';
-import 'package:flutter/material.dart';
+import 'package:adaptive_palette/src/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -240,7 +240,7 @@ void main() {
       expect(theme.secondary, isNot(equals(theme.primary)));
 
       // But still be a real color
-      expect(theme.secondary.alpha, 255);
+      expect(theme.secondary.a, 1.0);
     });
   });
 
@@ -306,7 +306,7 @@ void main() {
       );
 
       final result = lerpThemeColors(from, to, 1.0);
-      expect(result.primary.value, to.primary.value);
+      expect(result.primary, to.primary);
     });
   });
 }

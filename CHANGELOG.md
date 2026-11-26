@@ -5,16 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.1.1] - 2026-11-17
+## [3.2.0] - 2026-11-26
 
 ### Added
-- `FluidBackground.smoothTransitions` (default `false`) — when enabled, changing `imageProvider` keeps the previous image and palette fully visible until the new one loads, then crossfades the new fluid layers in on top, instead of dropping to the matte fallback first
-- Failed image loads no longer clear the display when `smoothTransitions` is enabled — the previous background stays on screen
+- `FluidBackground.smoothTransitions` (default `false`) — when enabled, changing `imageProvider` keeps the current image and palette on screen until the new one loads, then crossfades to it instead of cutting to the matte fallback. Setting `imageProvider` to `null` fades out to the fallback, a failed load keeps the current background, and rapid changes collapse into one crossfade to the latest image
+- Reduced motion support — the orbit stays still while the platform requests reduced motion (`MediaQuery.disableAnimations`), even with `animate: true`
+- WebAssembly support, and pub.dev topics and screenshot
+
+### Changed
+- **Supported Flutter versions are now 3.27 and newer** (Dart 3.6+), tested on 3.27, current stable and current beta. The previously declared minimum of 3.24 never worked: the code needs `Color.withValues` (3.27), and the `material_color_utilities: ^0.13.0` constraint only resolved on recent releases. The constraint is now `>=0.11.1 <0.14.0`
+- **`cached_network_image` is no longer a dependency.** It was only used by the `.network` factories of the deprecated `AdaptiveImageOverlay`, `AdaptiveGlowImageFrame` and `AdaptiveGradientScaffold`, and it pulled in `sqflite` and `path_provider`. Those factories now use Flutter's `NetworkImage` (memory cache only). To keep disk caching, pass a `CachedNetworkImageProvider` to the default constructors, and add `cached_network_image` to your own `pubspec.yaml` if you were relying on it transitively
+- `FluidFallbackMode.auto` follows the platform brightness when there is no Material theme above the widget (Cupertino apps, or apps on the new `material_ui` package without its compatibility bridge). It used to pick the light fallback in that case
+- The background paints in its own layer and is driven directly by its animations: the orbit and transitions no longer rebuild widgets or repaint the content on top, and content repaints no longer repaint the background
+- The orbit only runs while an image is showing
+- The palette cache is keyed on the pixels the extractor samples instead of a hash of every byte. Palettes are unchanged; extraction is about 3x faster for large images and a cache hit is about 10x faster
+- Images loaded by `FluidBackground`, `extractColors` and `warmup` are disposed when no longer needed. `loadImageFromProvider` hands ownership to the caller, who should dispose the image
+- The published package no longer contains the demo app (`lib/main.dart` and the root platform folders); it lives in `example/`
 
 ### Fixed
 - `FluidBackground.animate` now actually animates: the motion phase was read outside the `AnimatedBuilder`, so the background never repainted with the current orbit phase and snapped to it whenever the state rebuilt (e.g. at the end of a transition)
-- The shader layer rotation is now periodic — it used to snap ~10° every motion cycle wrap when `animate` is enabled
-- The crossfade alphas are baked into the shader painter inside a single blur layer, so the blur layer's structure no longer changes mid-transition
+- The shader layer rotation is continuous — it used to snap ~10° at every motion cycle wrap. The resting frame (`animate: false`) is unchanged
+- With reduced motion enabled on the platform, the first orbit cycle ran 20x faster than intended
+- A changed `transitionDuration` is now applied
+- `FluidPalette.baseDark` could exceed the documented lightness limit of 0.22 by a rounding step
+- Deprecated `AdaptivePalette.fromImage`: crash on very wide or very tall images, and a cached dark result being returned for a light request (and vice versa)
+- Uses of Flutter APIs deprecated since 3.27 (`Color.value`, `withOpacity`, `Matrix4.translate`/`scale`)
+
+### Notes
+- Flutter 3.47 deprecated `package:flutter/material.dart` in favour of the separate `material_ui` package, which requires Flutter 3.47+. This release keeps using the SDK's Material library so that older Flutter versions stay supported. It works inside `material_ui` apps; see "Apps built on `material_ui`" in the README
 
 ## [3.1.0] - 2026-03-03
 

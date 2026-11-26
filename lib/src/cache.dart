@@ -5,7 +5,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
-import 'package:flutter/material.dart';
+import 'package:flutter/painting.dart';
 
 import 'config.dart';
 import 'fluid_palette.dart';
@@ -116,6 +116,7 @@ String computeImageHash(Uint8List data) {
 /// [colors] contains up to 10 dominant colors (max allowed by [extractColors]).
 /// Callers requesting fewer than 10 take the leading slice.
 class FluidCacheEntry {
+  /// Creates a cache entry holding both representations of one extraction.
   const FluidCacheEntry({required this.colors, required this.palette});
 
   /// Dominant colors ranked by vibrancy, matte-treated. Max 10 entries.

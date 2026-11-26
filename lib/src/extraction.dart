@@ -189,11 +189,15 @@ Uint8List downsampleImage(Uint8List src, int w, int h, int target) {
     tw = (target * aspect).round();
   }
 
+  // Extreme aspect ratios can round one side down to nothing.
+  tw = math.max(1, tw);
+  th = math.max(1, th);
+
   final out = Uint8List(tw * th * 4);
   for (int y = 0; y < th; y++) {
-    final sy = (y * (h - 1) / (th - 1)).round();
+    final sy = th > 1 ? (y * (h - 1) / (th - 1)).round() : 0;
     for (int x = 0; x < tw; x++) {
-      final sx = (x * (w - 1) / (tw - 1)).round();
+      final sx = tw > 1 ? (x * (w - 1) / (tw - 1)).round() : 0;
       final si = (sy * w + sx) * 4;
       final di = (y * tw + x) * 4;
       out[di] = src[si];
@@ -205,19 +209,30 @@ Uint8List downsampleImage(Uint8List src, int w, int h, int target) {
   return out;
 }
 
-/// Load ui.Image from ImageProvider.
-Future<ui.Image> loadImageFromProvider(ImageProvider provider) async {
+/// Loads the first frame of [provider] as a [ui.Image].
+///
+/// The returned image belongs to the caller: call [ui.Image.dispose] on it
+/// once it is no longer needed to release its memory promptly.
+///
+/// Throws if the image fails to load.
+Future<ui.Image> loadImageFromProvider(ImageProvider provider) {
   final completer = Completer<ui.Image>();
   final stream = provider.resolve(const ImageConfiguration());
-  ImageStreamListener? listener;
+  late final ImageStreamListener listener;
   listener = ImageStreamListener(
     (ImageInfo info, bool _) {
-      completer.complete(info.image);
-      stream.removeListener(listener!);
+      if (completer.isCompleted) {
+        // A frame delivered after an error or a previous frame is not ours
+        // to keep.
+        info.dispose();
+      } else {
+        completer.complete(info.image);
+      }
+      stream.removeListener(listener);
     },
     onError: (Object e, StackTrace? st) {
       if (!completer.isCompleted) completer.completeError(e, st);
-      stream.removeListener(listener!);
+      stream.removeListener(listener);
     },
   );
   stream.addListener(listener);

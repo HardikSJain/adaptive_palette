@@ -1,7 +1,7 @@
 /// Core data models for adaptive palette.
 library;
 
-import 'package:flutter/material.dart';
+import 'material.dart';
 
 /// Theme colors extracted from an image with accessibility guarantees.
 ///
@@ -246,7 +246,8 @@ class AdaptiveOverlayStyle {
     final resolved = baseColor ?? colorOverride ?? _resolveColor(colors);
     final resolvedColors = this.colors ??
         opacities
-            .map((opacity) => resolved.withOpacity(opacity.clamp(0.0, 1.0)))
+            .map((opacity) =>
+                resolved.withValues(alpha: opacity.clamp(0.0, 1.0)))
             .toList(growable: false);
 
     assert(
