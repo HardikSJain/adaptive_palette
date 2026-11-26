@@ -116,6 +116,7 @@ String computeImageHash(Uint8List data) {
 /// [colors] contains up to 10 dominant colors (max allowed by [extractColors]).
 /// Callers requesting fewer than 10 take the leading slice.
 class FluidCacheEntry {
+  /// Creates a cache entry holding both representations of one extraction.
   const FluidCacheEntry({required this.colors, required this.palette});
 
   /// Dominant colors ranked by vibrancy, matte-treated. Max 10 entries.
