@@ -216,11 +216,24 @@ class AdaptivePalette {
 
     // Load image
     final img = await loadImageFromProvider(provider);
-    final bytes = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final int w = img.width;
+    final int h = img.height;
+    final ByteData? bytes;
+    try {
+      bytes = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+    } finally {
+      img.dispose();
+    }
     if (bytes == null) return const ThemeColors.fallback();
 
-    // Check cache
-    final key = computeImageHash(bytes.buffer.asUint8List());
+    // Check cache. The result depends on the configuration as well as the
+    // image, so both are part of the key.
+    final key = '${computeImageHash(bytes.buffer.asUint8List())}'
+        '|${effectiveConfig.targetBrightness.name}'
+        '|${effectiveConfig.quantizeColors}'
+        '|${effectiveConfig.resize}'
+        '|${effectiveConfig.minContrast}'
+        '|${effectiveConfig.diversityWeight}';
     final cached = PaletteCache.instance.get(key);
     if (cached != null) {
       final duration = DateTime.now().difference(startTime);
@@ -228,8 +241,8 @@ class AdaptivePalette {
         duration: duration,
         colorsExtracted: 0,
         pixelsProcessed: 0,
-        originalSize: (img.width, img.height),
-        processedSize: (img.width, img.height),
+        originalSize: (w, h),
+        processedSize: (w, h),
         fromCache: true,
         imageType: 'cached',
         avgSaturation: 0,
@@ -240,8 +253,6 @@ class AdaptivePalette {
     }
 
     final pixels = bytes.buffer.asUint8List();
-    final w = img.width;
-    final h = img.height;
 
     // Downsample for performance
     final sampled = downsampleImage(

@@ -4,3 +4,7 @@ analyzer:
   exclude:
     - build/**
     - example/build/**
+  errors:
+    # The deprecated v2 API has to keep referring to itself until it is
+    # removed in 4.0.0.
+    deprecated_member_use_from_same_package: ignore

@@ -11,7 +11,7 @@ import 'dart:ui' show Color;
 ///
 /// Example:
 /// ```dart
-/// final palette = await FluidPaletteExtractor.extract(image);
+/// final palette = await FluidPaletteExtractor.buildPaletteFromImage(image);
 /// print('Base: ${palette.baseDark}');
 /// print('Accents: ${palette.accent1}, ${palette.accent2}...');
 /// ```
@@ -31,6 +31,7 @@ class FluidPalette {
   /// Fourth accent color (bottom-right glow).
   final Color accent4;
 
+  /// Creates a palette from a base color and four accents.
   const FluidPalette({
     required this.baseDark,
     required this.accent1,
@@ -106,12 +107,7 @@ class FluidPalette {
           accent4 == other.accent4;
 
   @override
-  int get hashCode =>
-      baseDark.hashCode ^
-      accent1.hashCode ^
-      accent2.hashCode ^
-      accent3.hashCode ^
-      accent4.hashCode;
+  int get hashCode => Object.hash(baseDark, accent1, accent2, accent3, accent4);
 
   @override
   String toString() {
