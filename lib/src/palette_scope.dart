@@ -1,7 +1,7 @@
 /// Animated theme container for app-wide palette management.
 library;
 
-import 'package:flutter/material.dart';
+import 'material.dart';
 
 import 'models.dart';
 import 'theme.dart';

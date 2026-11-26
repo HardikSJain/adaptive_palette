@@ -365,6 +365,7 @@ class _WrongExample1State extends State<WrongExample1> {
       const NetworkImage('image.jpg'),
     );
     // ❌ Widget might be disposed!
+    // ignore: use_build_context_synchronously
     PaletteScope.of(context).animateTo(colors);
   }
 

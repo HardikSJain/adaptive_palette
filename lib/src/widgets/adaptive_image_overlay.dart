@@ -1,8 +1,7 @@
 /// Hero/card widget with adaptive gradient overlay.
 library;
 
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import '../material.dart';
 
 import '../config.dart';
 import '../models.dart';
@@ -83,21 +82,14 @@ class AdaptiveImageOverlay extends StatefulWidget {
   }) {
     return AdaptiveImageOverlay(
       key: key,
-      imageProvider: CachedNetworkImageProvider(imageUrl),
+      imageProvider: NetworkImage(imageUrl),
       overlayStyle: overlayStyle,
       aspectRatio: aspectRatio,
       borderRadius: borderRadius,
       padding: padding,
       alignment: alignment,
       fit: fit,
-      backgroundImage: CachedNetworkImage(
-        imageUrl: imageUrl,
-        fit: fit,
-        placeholder: (_, __) => const ColoredBox(color: Colors.black12),
-        errorWidget: (_, __, ___) => const ColoredBox(
-          color: Colors.black12,
-        ),
-      ),
+      backgroundImage: networkBackgroundImage(imageUrl, fit: fit),
       config: config,
       fallbackColors: fallbackColors,
       onColorsReady: onColorsReady,
@@ -158,7 +150,7 @@ class _AdaptiveImageOverlayState extends State<AdaptiveImageOverlay> {
           borderRadius: widget.borderRadius,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.25),
+              color: Colors.black.withValues(alpha: 0.25),
               blurRadius: 32,
               offset: const Offset(0, 18),
             ),

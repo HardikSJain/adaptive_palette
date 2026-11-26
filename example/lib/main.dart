@@ -61,7 +61,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
 
   void _previousSong() {
     setState(() {
-      _currentIndex = (_currentIndex - 1 + _albumImages.length) % _albumImages.length;
+      _currentIndex =
+          (_currentIndex - 1 + _albumImages.length) % _albumImages.length;
     });
   }
 

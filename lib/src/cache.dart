@@ -5,7 +5,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
-import 'package:flutter/material.dart';
+import 'package:flutter/painting.dart';
 
 import 'config.dart';
 import 'fluid_palette.dart';

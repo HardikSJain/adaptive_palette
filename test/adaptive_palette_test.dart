@@ -1,5 +1,5 @@
 import 'package:adaptive_palette/adaptive_palette.dart';
-import 'package:flutter/material.dart';
+import 'package:adaptive_palette/src/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -142,7 +142,7 @@ void main() {
         stops: [0.0],
       ).build(colors);
 
-      expect(gradient.colors.first.value, override.value);
+      expect(gradient.colors.first, override);
     });
 
     test('copyWith works correctly', () {

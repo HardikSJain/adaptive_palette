@@ -1,7 +1,7 @@
 /// Fluid dynamic palette with base and accent colors for immersive backgrounds.
 library;
 
-import 'package:flutter/material.dart';
+import 'dart:ui' show Color;
 
 /// Fluid dynamic color palette extracted from an image.
 ///
