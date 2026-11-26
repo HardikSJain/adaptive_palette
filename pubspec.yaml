@@ -1,6 +1,6 @@
 name: adaptive_palette
 description: Immersive fluid animated backgrounds from images. Weighted k-means color extraction, LRU cache, dark/light/auto fallback, and smooth orbital motion.
-version: 3.1.0
+version: 3.1.1
 homepage: https://github.com/HardikSJain/adaptive_palette
 repository: https://github.com/HardikSJain/adaptive_palette
 issue_tracker: https://github.com/HardikSJain/adaptive_palette/issues

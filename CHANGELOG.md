@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2026-11-17
+
+### Added
+- `FluidBackground.smoothTransitions` (default `false`) — when enabled, changing `imageProvider` keeps the previous image and palette fully visible until the new one loads, then crossfades the new fluid layers in on top, instead of dropping to the matte fallback first
+- Failed image loads no longer clear the display when `smoothTransitions` is enabled — the previous background stays on screen
+
+### Fixed
+- `FluidBackground.animate` now actually animates: the motion phase was read outside the `AnimatedBuilder`, so the background never repainted with the current orbit phase and snapped to it whenever the state rebuilt (e.g. at the end of a transition)
+- The shader layer rotation is now periodic — it used to snap ~10° every motion cycle wrap when `animate` is enabled
+- The crossfade alphas are baked into the shader painter inside a single blur layer, so the blur layer's structure no longer changes mid-transition
+
 ## [3.1.0] - 2026-03-03
 
 ### Added
